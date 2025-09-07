@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<ruleset name="Politeia Standards">
+  <description>WordPress Coding Standards</description>
+  <file>./</file>
+  <arg value="sp"/>
+  <exclude-pattern>*/vendor/*</exclude-pattern>
+  <rule ref="WordPress"/>
+  <rule ref="WordPress-Docs"/>
+  <rule ref="WordPress-Core"/>
+  <rule ref="WordPress-Extra"/>
+  <config name="testVersion" value="7.4-"/>
+</ruleset>

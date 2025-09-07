@@ -1,0 +1,25 @@
+{
+  "name": "politeia/politeia-electoral-map",
+  "description": "Politeia Electoral Map",
+  "type": "wordpress-plugin",
+  "license": "GPL-2.0-or-later",
+  "autoload": {
+    "psr-4": {
+      "Politeia\\": "includes/"
+    }
+  },
+  "require": {},
+  "require-dev": {
+    "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
+    "wp-coding-standards/wpcs": "^3.0"
+  },
+  "scripts": {
+    "lint": "vendor/bin/phpcs --standard=phpcs.xml.dist --extensions=php,inc --ignore=vendor .",
+    "fix": "vendor/bin/phpcbf --standard=phpcs.xml.dist --extensions=php,inc --ignore=vendor ."
+  },
+  "config": {
+    "allow-plugins": {
+      "dealerdirect/phpcodesniffer-composer-installer": true
+    }
+  }
+}
