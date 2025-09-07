@@ -5,88 +5,37 @@
   <title>Politeia Electoral Map – RM</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    html, body {
-      height: 100%;
-      margin: 0;
-      padding: 0;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-    }
+    html, body { height: 100%; margin: 0; padding: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
     #app { position: relative; width: 100%; height: 100%; }
     #map { position: absolute; inset: 0; }
 
     .toolbar {
-      position: absolute;
-      top: 16px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: min(720px, calc(100% - 24px));
-      z-index: 5;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
+      position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+      width: min(720px, calc(100% - 24px)); z-index: 5; display: flex; flex-direction: column; gap: 6px;
     }
     .search {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: #fff;
-      border-radius: 10px;
-      padding: 10px 12px;
-      box-shadow: 0 8px 24px rgba(0,0,0,.12), 0 2px 6px rgba(0,0,0,.06);
-      border: 1px solid rgba(0,0,0,.06);
+      display: flex; align-items: center; gap: 8px; background: #fff; border-radius: 10px; padding: 10px 12px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.12), 0 2px 6px rgba(0,0,0,.06); border: 1px solid rgba(0,0,0,.06);
     }
-    .search input {
-      width: 100%;
-      font-size: 16px;
-      border: none;
-      outline: none;
-      background: transparent;
-    }
+    .search input { width: 100%; font-size: 16px; border: none; outline: none; background: transparent; }
     .suggestions {
-      background: #fff;
-      border: 1px solid rgba(0,0,0,.08);
-      border-radius: 10px;
-      overflow: hidden;
+      background: #fff; border: 1px solid rgba(0,0,0,.08); border-radius: 10px; overflow: hidden;
       box-shadow: 0 8px 24px rgba(0,0,0,.12), 0 2px 6px rgba(0,0,0,.06);
-      display: none;
-      max-height: 280px;
-      overflow-y: auto;
+      display: none; max-height: 280px; overflow-y: auto;
     }
     .suggestions.visible { display: block; }
-    .suggestion {
-      padding: 10px 12px;
-      cursor: pointer;
-      display: flex;
-      justify-content: space-between;
-      border-bottom: 1px solid rgba(0,0,0,.04);
-      font-size: 15px;
-    }
+    .suggestion { padding: 10px 12px; cursor: pointer; display: flex; justify-content: space-between; border-bottom: 1px solid rgba(0,0,0,.04); font-size: 15px; }
     .suggestion:last-child { border-bottom: none; }
     .suggestion:hover { background: #f4f7ff; }
     .suggestion small { color: #6b7280; }
 
     .chip {
-      position: absolute;
-      left: 14px;
-      bottom: 14px;
-      z-index: 4;
-      background: rgba(255,255,255,.96);
-      border: 1px solid rgba(0,0,0,.06);
-      border-radius: 10px;
-      padding: 8px 10px;
-      font-size: 14px;
+      position: absolute; left: 14px; bottom: 14px; z-index: 4; background: rgba(255,255,255,.96);
+      border: 1px solid rgba(0,0,0,.06); border-radius: 10px; padding: 8px 10px; font-size: 14px;
       box-shadow: 0 6px 18px rgba(0,0,0,.10), 0 1px 4px rgba(0,0,0,.06);
-      max-width: min(50vw, 420px);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      max-width: min(50vw, 420px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
-    .hint {
-      font-size: 12px;
-      color: #6b7280;
-      text-align: center;
-      text-shadow: 0 1px 2px rgba(255,255,255,.8);
-    }
+    .hint { font-size: 12px; color: #6b7280; text-align: center; text-shadow: 0 1px 2px rgba(255,255,255,.8); }
   </style>
 </head>
 <body>
@@ -105,32 +54,27 @@
   </div>
 
   <script>
+    // --- Parámetros y rutas ---
     const params = new URLSearchParams(location.search);
     const API_KEY = params.get('api_key') || '';
-    const GEOJSON_URL = '../geojson/comunas_rm_oficial_wgs84.geojson';
+    const GEOJSON_URL = '../geojson/comunas_rm_oficial_wgs84.geojson'; // ya solo RM en WGS84
 
+    // --- Estado ---
     let map, highlighted = null;
     const idxByName = new Map();
 
-    function norm(s) {
-      return (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
-    }
+    // --- Utils ---
+    const norm = s => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
 
     function comunaName(feature) {
       const keys = ['Comuna','COMUNA','NOM_COMUNA','name'];
-      for (const k of keys) {
-        const v = feature.getProperty(k);
-        if (v) return v;
-      }
+      for (const k of keys) { const v = feature.getProperty(k); if (v) return v; }
       return 'Sin nombre';
     }
 
     function provinciaName(feature) {
       const keys = ['Provincia','PROVINCIA'];
-      for (const k of keys) {
-        const v = feature.getProperty(k);
-        if (v) return v;
-      }
+      for (const k of keys) { const v = feature.getProperty(k); if (v) return v; }
       return '';
     }
 
@@ -145,18 +89,32 @@
     }
 
     function highlight(feature) {
-      if (highlighted && highlighted !== feature) {
-        highlighted.setProperty('isHighlighted', false);
-      }
+      if (highlighted && highlighted !== feature) highlighted.setProperty('isHighlighted', false);
       highlighted = feature;
       if (feature) feature.setProperty('isHighlighted', true);
       map.data.setStyle(styleFeature);
     }
 
-    function fitFeature(feature) {
+    // --- Fit con offset a "2/3 derecha" (configurable) ---
+    function fitFeatureWithOffset(feature, {
+      padding = { top: 80, right: 20, bottom: 20, left: 20 },
+      xRatio = 2/3,   // 0 = borde izq … 0.5 = centro … 1 = borde der
+      yRatio = 0.5    // 0 = arriba … 0.5 = centro … 1 = abajo
+    } = {}) {
       const bounds = new google.maps.LatLngBounds();
       feature.getGeometry().forEachLatLng(p => bounds.extend(p));
-      map.fitBounds(bounds, { top: 80, right: 20, bottom: 20, left: 20 });
+
+      // 1) Ajusta a los límites
+      map.fitBounds(bounds, padding);
+
+      // 2) Cuando el mapa termina de ajustar, aplica panBy para desplazar el "punto medio"
+      google.maps.event.addListenerOnce(map, 'idle', () => {
+        const div = map.getDiv();
+        const w = div.clientWidth, h = div.clientHeight;
+        const panX = (0.5 - xRatio) * w; // xRatio=2/3 -> panX negativo (centro se mueve hacia la izq, dejando comuna en 2/3 der)
+        const panY = (0.5 - yRatio) * h;
+        map.panBy(panX, panY);
+      });
     }
 
     function buildIndex(feature) {
@@ -167,27 +125,20 @@
 
     function renderSuggestions(items) {
       const box = document.getElementById('suggestions');
-      if (!items.length) {
-        box.classList.remove('visible');
-        box.innerHTML = '';
-        return;
-      }
+      if (!items.length) { box.classList.remove('visible'); box.innerHTML = ''; return; }
       box.innerHTML = items.map(it => `
         <div class="suggestion" data-key="${it.key}">
-          <span>${it.name}</span>
-          ${it.provincia ? `<small>${it.provincia}</small>` : ''}
+          <span>${it.name}</span>${it.provincia ? `<small>${it.provincia}</small>` : ''}
         </div>`).join('');
       box.classList.add('visible');
-      box.querySelectorAll('.suggestion').forEach(el => {
-        el.addEventListener('click', () => selectByKey(el.dataset.key));
-      });
+      box.querySelectorAll('.suggestion').forEach(el => el.addEventListener('click', () => selectByKey(el.dataset.key)));
     }
 
     function selectByKey(key) {
       const hit = idxByName.get(key);
       if (!hit) return;
       highlight(hit.feature);
-      fitFeature(hit.feature);
+      fitFeatureWithOffset(hit.feature, { xRatio: 2/3, yRatio: 0.5 }); // <-- CORREGIDO
       document.getElementById('q').value = hit.name;
       document.getElementById('chip').textContent = hit.name;
       document.getElementById('suggestions').classList.remove('visible');
@@ -205,26 +156,19 @@
       return all.slice(0, 12);
     }
 
+    // --- Google Maps bootstrap ---
     window.initMap = function() {
       map = new google.maps.Map(document.getElementById('map'), {
-        center: { lat: -33.45, lng: -70.66 },
-        zoom: 9,
-        mapTypeControl: false,
-        streetViewControl: false,
-        fullscreenControl: true,
-        clickableIcons: false
+        center: { lat: -33.45, lng: -70.66 }, zoom: 9,
+        mapTypeControl: false, streetViewControl: false, fullscreenControl: true, clickableIcons: false
       });
       map.data.setStyle(styleFeature);
 
-      map.data.addListener('mouseover', e => {
-        document.getElementById('chip').textContent = comunaName(e.feature);
-      });
-      map.data.addListener('mouseout', e => {
-        document.getElementById('chip').textContent = highlighted ? comunaName(highlighted) : 'Selecciona una comuna';
-      });
-      map.data.addListener('dblclick', e => {
+      map.data.addListener('mouseover', e => { document.getElementById('chip').textContent = comunaName(e.feature); });
+      map.data.addListener('mouseout',  e => { document.getElementById('chip').textContent = highlighted ? comunaName(highlighted) : 'Selecciona una comuna'; });
+      map.data.addListener('dblclick',  e => {
         highlight(e.feature);
-        fitFeature(e.feature);
+        fitFeatureWithOffset(e.feature, { xRatio: 2/3, yRatio: 0.5 });   // <-- CORREGIDO
         document.getElementById('q').value = comunaName(e.feature);
         document.getElementById('chip').textContent = comunaName(e.feature);
       });
@@ -236,16 +180,14 @@
 
       const input = document.getElementById('q');
       const box = document.getElementById('suggestions');
-      input.addEventListener('input', () => renderSuggestions(search(input.value)));
+      input.addEventListener('input',   () => renderSuggestions(search(input.value)));
       input.addEventListener('keydown', e => {
         if (e.key === 'Enter') {
           const hits = search(input.value);
           if (hits.length) selectByKey(hits[0].key);
         } else if (e.key === 'Escape') box.classList.remove('visible');
       });
-      document.addEventListener('click', e => {
-        if (!e.target.closest('.toolbar')) box.classList.remove('visible');
-      });
+      document.addEventListener('click', e => { if (!e.target.closest('.toolbar')) box.classList.remove('visible'); });
     };
 
     if (API_KEY) {
