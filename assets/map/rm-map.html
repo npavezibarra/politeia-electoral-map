@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>RM – Buscador de comunas (Google Maps)</title>
+  <style>
+    html, body { height:100%; margin:0; }
+    #map { position:absolute; inset:0; }
+    .ui {
+      position:absolute; top:12px; left:12px; z-index:10;
+      background:rgba(255,255,255,.95); backdrop-filter:saturate(1.2) blur(4px);
+      border-radius:12px; box-shadow:0 6px 24px rgba(0,0,0,.12);
+      padding:10px 12px; display:flex; gap:8px; align-items:center;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, "Helvetica Neue", Arial;
+    }
+    .ui input[type="text"] {
+      width: 260px; max-width: 60vw; border:1px solid #ddd; border-radius:10px;
+      padding:8px 10px; outline: none; font-size:14px;
+    }
+    .pill { font-size:12px; color:#555; background:#f2f4f7; padding:4px 8px; border-radius:999px; }
+    .gm-style .gmnoprint a, .gm-style .gmnoprint span, .gm-style .gm-style-cc span { font-size:11px !important; }
+  </style>
+</head>
+<body>
+  <div class="ui">
+    <input id="search" type="text" placeholder="Busca una comuna de la RM… (p.ej. Las Condes)" autocomplete="off" />
+    <span id="status" class="pill">Cargando mapa…</span>
+  </div>
+  <div id="map"></div>
+
+  <script>
+    // ========= CONFIG =========
+    const GEOJSON_URL = '../geojson/comunas.geojson';
+    const norm = s => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
+    function isRM(props) {
+      const cands = [
+        props?.region, props?.Region, props?.REGION, props?.NOM_REGION,
+        props?.region_cod, props?.codigo_region, props?.COD_REG, props?.CUT_REG,
+        props?.CodigoRegion, props?.region_id
+      ].filter(v => v !== undefined && v !== null);
+
+      const byCode = cands.some(v => String(v).trim() === '13');
+      const byName = [props?.region, props?.Region, props?.REGION, props?.NOM_REGION]
+        .filter(Boolean)
+        .some(v => norm(String(v)).includes('metropolitana'));
+      return byCode || byName;
+    }
+
+    function comunaName(props) {
+      return props?.Comuna || props?.COMUNA || props?.comuna || props?.NOM_COMUNA ||
+             props?.name || props?.NAME || props?.NOM_COM || props?.Nombre ||
+             props?.nombre || 'Comuna';
+    }
+
+    let map, highlighted = null, indexByName = new Map(), allRM = [];
+
+    function featureBounds(geometry) {
+      const bounds = new google.maps.LatLngBounds();
+      geometry.forEachLatLng(latlng => bounds.extend(latlng));
+      return bounds;
+    }
+
+    function setHighlight(feature) {
+      if (highlighted && highlighted !== feature) {
+        highlighted.setProperty('isHighlighted', false);
+      }
+      if (feature) {
+        feature.setProperty('isHighlighted', true);
+        highlighted = feature;
+      } else {
+        highlighted = null;
+      }
+      map.data.setStyle(styleFn);
+    }
+
+    function styleFn(feature) {
+      const inRM = feature.getProperty('inRM') === true;
+      if (!inRM) return { visible: false };
+
+      const isH = feature.getProperty('isHighlighted') === true;
+      return {
+        fillColor: isH ? '#66b3ff' : '#9ecae1',
+        fillOpacity: isH ? 0.35 : 0.15,
+        strokeColor: isH ? '#0d6efd' : '#666',
+        strokeWeight: isH ? 3 : 1,
+        visible: true
+      };
+    }
+
+    async function initMap() {
+      map = new google.maps.Map(document.getElementById('map'), {
+        center: { lat: -33.45, lng: -70.66 },
+        zoom: 10,
+        gestureHandling: 'greedy'
+      });
+
+      map.data.setStyle(styleFn);
+
+      // Cargar GeoJSON y etiquetar features
+      let resp = await fetch(GEOJSON_URL, { cache: 'no-store' });
+      const geo = await resp.json();
+      const features = geo.type === 'FeatureCollection' ? geo.features : geo;
+
+      features.forEach(f => {
+        const props = f.properties || {};
+        const rmFlag = isRM(props);
+        const name = comunaName(props);
+
+        const feat = map.data.addGeoJson({
+          type: 'Feature',
+          properties: {
+            ...props,
+            name,
+            name_norm: norm(name),
+            inRM: rmFlag,
+            isHighlighted: false
+          },
+          geometry: f.geometry
+        });
+
+        feat.forEach(gf => {
+          if (rmFlag) {
+            allRM.push(gf);
+            indexByName.set(gf.getProperty('name_norm'), gf);
+          }
+        });
+      });
+
+      // Ajustar vista a toda la RM
+      if (allRM.length) {
+        const b = new google.maps.LatLngBounds();
+        allRM.forEach(feat => {
+          const fb = featureBounds(feat.getGeometry());
+          b.union(fb);
+        });
+        map.fitBounds(b, 20);
+      }
+
+      // Eventos de hover
+      map.data.addListener('mouseover', e => {
+        if (!e.feature.getProperty('inRM')) return;
+        map.data.overrideStyle(e.feature, { strokeWeight: 2 });
+        document.getElementById('status').textContent = e.feature.getProperty('name');
+      });
+      map.data.addListener('mouseout', e => {
+        map.data.revertStyle(e.feature);
+        document.getElementById('status').textContent = highlighted
+          ? highlighted.getProperty('name')
+          : `Comunas RM: ${allRM.length}`;
+      });
+
+      // Doble clic → zoom
+      map.data.addListener('dblclick', e => {
+        if (!e.feature.getProperty('inRM')) return;
+        const b = featureBounds(e.feature.getGeometry());
+        map.fitBounds(b, 50);
+        setHighlight(e.feature);
+        document.getElementById('status').textContent = e.feature.getProperty('name');
+      });
+
+      // Buscador
+      const input = document.getElementById('search');
+      input.addEventListener('input', () => {
+        const q = norm(input.value);
+        if (!q || q.length < 2) {
+          setHighlight(null);
+          document.getElementById('status').textContent = `Comunas RM: ${allRM.length}`;
+          return;
+        }
+
+        let feat =
+          indexByName.get(q) ||
+          (() => {
+            for (const [n, f] of indexByName.entries()) if (n.startsWith(q)) return f;
+            for (const [n, f] of indexByName.entries()) if (n.includes(q)) return f;
+            return null;
+          })();
+
+        if (feat) {
+          setHighlight(feat);
+          const b = featureBounds(feat.getGeometry());
+          map.fitBounds(b, 60);
+          document.getElementById('status').textContent = feat.getProperty('name');
+        }
+      });
+
+      document.getElementById('status').textContent = `Comunas RM: ${allRM.length}`;
+    }
+
+    // ========= Carga dinámica del script de Google Maps =========
+    const params = new URLSearchParams(location.search);
+    const apiKey = params.get('api_key');
+
+    if (apiKey) {
+      const s = document.createElement('script');
+      s.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=geometry&callback=initMap`;
+      s.async = true;
+      s.defer = true;
+      document.body.appendChild(s);
+    } else {
+      document.getElementById('status').textContent =
+        '⚠️ Falta configurar la Google Maps API Key en WP Admin → Electoral Map';
+    }
+  </script>
+</body>
+</html>

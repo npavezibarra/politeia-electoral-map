@@ -1,16 +1,32 @@
 <?php
 namespace Politeia\Modules\Assets;
 
+if ( ! defined('ABSPATH') ) exit;
+
 class Assets {
-    public function register(): void {
-        add_action('wp_enqueue_scripts', [$this, 'enqueue_front']);
-        add_action('admin_enqueue_scripts', [$this, 'enqueue_admin']);
-    }
-    public function boot(): void {}
-    public function enqueue_front(): void {
-        wp_enqueue_style('politeia-electoral-map-app', _URL . 'assets/css/app.css', [], _VER);
-        wp_enqueue_script('politeia-electoral-map-app', _URL . 'assets/js/app.js', ['wp-i18n'], _VER, true);
-        wp_localize_script('politeia-electoral-map-app', '', ['rest' => esc_url_raw( rest_url('politeia-electoral-map/v1') )]);
-    }
-    public function enqueue_admin(): void {}
+
+	public function __construct() {
+		add_action('wp_enqueue_scripts', [ $this, 'enqueue_front' ]);
+		add_action('admin_enqueue_scripts', [ $this, 'enqueue_admin' ]);
+	}
+
+	public function enqueue_front() {
+		// Usa constantes globales con prefijo "\" por estar en namespace
+		$base_url = \PLEM_URL;
+
+		// Ejemplos de enqueue (ajusta si no tienes estos archivos aún)
+		// wp_enqueue_style('plem-map', $base_url . 'assets/css/map.css', [], \PLEM_VER);
+		// wp_enqueue_script('plem-frontend', $base_url . 'assets/js/frontend.js', [], \PLEM_VER, true);
+	}
+
+	public function enqueue_admin($hook = '') {
+		// Si quieres cargar algo sólo en la página de ajustes:
+		// if ($hook !== 'toplevel_page_plem-settings') return;
+
+		$base_url = \PLEM_URL;
+		// wp_enqueue_style('plem-admin', $base_url . 'assets/css/admin.css', [], \PLEM_VER);
+	}
 }
+
+// Instancia el módulo (hazlo desde tu contenedor/inicializador si tienes uno)
+new Assets();
