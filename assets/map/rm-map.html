@@ -9,20 +9,11 @@
       height: 100%;
       margin: 0;
       padding: 0;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
     }
-    #app {
-      position: relative;
-      width: 100%;
-      height: 100%;
-      background: #f5f6f8;
-    }
-    #map {
-      position: absolute;
-      inset: 0;
-    }
+    #app { position: relative; width: 100%; height: 100%; }
+    #map { position: absolute; inset: 0; }
 
-    /* Search UI */
     .toolbar {
       position: absolute;
       top: 16px;
@@ -67,7 +58,6 @@
       cursor: pointer;
       display: flex;
       justify-content: space-between;
-      gap: 8px;
       border-bottom: 1px solid rgba(0,0,0,.04);
       font-size: 15px;
     }
@@ -75,7 +65,6 @@
     .suggestion:hover { background: #f4f7ff; }
     .suggestion small { color: #6b7280; }
 
-    /* Info chip bottom-left */
     .chip {
       position: absolute;
       left: 14px;
@@ -86,15 +75,12 @@
       border-radius: 10px;
       padding: 8px 10px;
       font-size: 14px;
-      color: #111827;
       box-shadow: 0 6px 18px rgba(0,0,0,.10), 0 1px 4px rgba(0,0,0,.06);
       max-width: min(50vw, 420px);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
-
-    /* Tiny help */
     .hint {
       font-size: 12px;
       color: #6b7280;
@@ -105,112 +91,59 @@
 </head>
 <body>
   <div id="app">
-    <div id="map" aria-label="Mapa Región Metropolitana"></div>
+    <div id="map"></div>
 
-    <div class="toolbar" role="search" aria-label="Buscador de comunas">
+    <div class="toolbar">
       <div class="search">
-        <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" fill="none" stroke="#4b5563" stroke-width="2" stroke-linecap="round"/></svg>
-        <input id="q" type="search" placeholder="Busca una comuna de la RM (ej: Las Condes, Maipú, Puente Alto…)" autocomplete="off" />
+        <input id="q" type="search" placeholder="Busca una comuna de la RM (ej: Las Condes, Maipú…)" autocomplete="off" />
       </div>
-      <div id="suggestions" class="suggestions" role="listbox" aria-label="Sugerencias"></div>
-      <div class="hint">Doble clic sobre una comuna para centrarla. Pasa el mouse para ver el nombre.</div>
+      <div id="suggestions" class="suggestions"></div>
+      <div class="hint">Doble clic en una comuna para centrarla. Pasa el mouse para ver el nombre.</div>
     </div>
 
-    <div id="chip" class="chip" aria-live="polite">Cargando mapa…</div>
+    <div id="chip" class="chip">Cargando mapa…</div>
   </div>
 
   <script>
-    // --- Utilidades ---
-    const $ = sel => document.querySelector(sel);
-    const $$ = sel => Array.from(document.querySelectorAll(sel));
-
-    // Normaliza texto para buscar: minúsculas, sin tildes
-    const norm = (s) => (s || '')
-      .toString()
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/\s+/g, ' ')
-      .trim();
-
-    // Lee api_key de la URL del iframe
     const params = new URLSearchParams(location.search);
     const API_KEY = params.get('api_key') || '';
+    const GEOJSON_URL = '../geojson/comunas_rm_oficial_wgs84.geojson';
 
-    // Ruta al GeoJSON respecto a este HTML:
-    const GEOJSON_URL = '../geojson/comunas.geojson';
+    let map, highlighted = null;
+    const idxByName = new Map();
 
-    // Centro aproximado RM
-    const RM_CENTER = { lat: -33.45, lng: -70.66 };
-    const RM_ZOOM = 9;
-
-    // Estado
-    let map;
-    let highlighted = null;
-    const idxByName = new Map(); // name_norm -> {name, provincia, feature}
-    const featuresRM = [];        // lista de features (RM) para iterar
-
-    // --- Inyecta Google Maps JS dinámicamente ---
-    (function injectMaps() {
-      if (!API_KEY) {
-        $('#chip').textContent = 'Falta api_key en la URL del iframe (configúrala en WP Admin).';
-        console.warn('No API key. Agrega ?api_key=YOUR_KEY al src del iframe.');
-        return;
-      }
-      const s = document.createElement('script');
-      s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(API_KEY)}&callback=initMap`;
-      s.async = true;
-      s.defer = true;
-      document.head.appendChild(s);
-    })();
-
-    // --- Helpers de propiedades según dataset observado ---
-    function getCodRegion(feature) {
-      // Posibles claves según distintos datasets
-      const keys = ['codregion', 'CodigoRegion', 'COD_REGION', 'REGION_ID', 'region_id', 'c_region'];
-      for (const k of keys) {
-        const v = feature.getProperty(k);
-        if (v !== undefined && v !== null && v !== '') return v;
-      }
-      // Fallback semántico: por nombre textual
-      const regName = feature.getProperty('Region') || feature.getProperty('REGION') || feature.getProperty('region');
-      if (regName && /metropolitana/i.test(regName)) return 13;
-      return null;
+    function norm(s) {
+      return (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
     }
 
-    function getComunaName(feature) {
-      const keys = ['Comuna','COMUNA','NOM_COMUNA','name','Nombre','nom_com','NOM_COM','comuna'];
+    function comunaName(feature) {
+      const keys = ['Comuna','COMUNA','NOM_COMUNA','name'];
       for (const k of keys) {
         const v = feature.getProperty(k);
-        if (v) return String(v);
+        if (v) return v;
       }
       return 'Sin nombre';
     }
 
-    function getProvinciaName(feature) {
-      const keys = ['Provincia','PROVINCIA','provincia','NOM_PROV','nom_prov'];
+    function provinciaName(feature) {
+      const keys = ['Provincia','PROVINCIA'];
       for (const k of keys) {
         const v = feature.getProperty(k);
-        if (v) return String(v);
+        if (v) return v;
       }
       return '';
     }
 
-    // Estilo por estado
     function styleFeature(feature) {
       const isH = !!feature.getProperty('isHighlighted');
       return {
         fillColor: isH ? '#3b82f6' : '#2563eb',
         fillOpacity: isH ? 0.28 : 0.14,
         strokeColor: isH ? '#1d4ed8' : '#1e40af',
-        strokeOpacity: 0.9,
-        strokeWeight: isH ? 2.6 : 1.6,
-        clickable: true,
-        zIndex: isH ? 2 : 1
+        strokeWeight: isH ? 2.6 : 1.6
       };
     }
 
-    // Resalta solo una comuna
     function highlight(feature) {
       if (highlighted && highlighted !== feature) {
         highlighted.setProperty('isHighlighted', false);
@@ -220,188 +153,109 @@
       map.data.setStyle(styleFeature);
     }
 
-    // Ajusta el mapa a la geometría de la feature
     function fitFeature(feature) {
       const bounds = new google.maps.LatLngBounds();
-      processGeometry(feature.getGeometry(), bounds.extend, bounds);
+      feature.getGeometry().forEachLatLng(p => bounds.extend(p));
       map.fitBounds(bounds, { top: 80, right: 20, bottom: 20, left: 20 });
     }
 
-    // Recorre geometrías (Polygon/MultiPolygon)
-    function processGeometry(geom, callback, thisArg) {
-      if (geom instanceof google.maps.Data.Point) {
-        callback.call(thisArg, geom.get());
-      } else {
-        geom.getArray().forEach(g => processGeometry(g, callback, thisArg));
-      }
+    function buildIndex(feature) {
+      const name = comunaName(feature);
+      const provincia = provinciaName(feature);
+      idxByName.set(norm(name), { name, provincia, feature });
     }
 
-    // Construye índice de búsqueda
-    function indexFeature(feature) {
-      const name = getComunaName(feature);
-      const provincia = getProvinciaName(feature);
-      const key = norm(name);
-      idxByName.set(key, { name, provincia, feature });
-      featuresRM.push(feature);
-    }
-
-    // Renderiza sugerencias
     function renderSuggestions(items) {
-      const box = $('#suggestions');
+      const box = document.getElementById('suggestions');
       if (!items.length) {
         box.classList.remove('visible');
         box.innerHTML = '';
         return;
       }
       box.innerHTML = items.map(it => `
-        <div class="suggestion" role="option" data-key="${it.key}">
+        <div class="suggestion" data-key="${it.key}">
           <span>${it.name}</span>
           ${it.provincia ? `<small>${it.provincia}</small>` : ''}
-        </div>
-      `).join('');
+        </div>`).join('');
       box.classList.add('visible');
-
-      // Click en sugerencia
-      $$('#suggestions .suggestion').forEach(el => {
-        el.addEventListener('click', () => {
-          const k = el.getAttribute('data-key');
-          selectByKey(k);
-        });
+      box.querySelectorAll('.suggestion').forEach(el => {
+        el.addEventListener('click', () => selectByKey(el.dataset.key));
       });
     }
 
-    // Selección desde el índice por key normalizada
     function selectByKey(key) {
       const hit = idxByName.get(key);
       if (!hit) return;
       highlight(hit.feature);
       fitFeature(hit.feature);
-      $('#q').value = hit.name;
-      $('#chip').textContent = `${hit.name}${hit.provincia ? `, ${hit.provincia}` : ''}`;
-      $('#suggestions').classList.remove('visible');
+      document.getElementById('q').value = hit.name;
+      document.getElementById('chip').textContent = hit.name;
+      document.getElementById('suggestions').classList.remove('visible');
     }
 
-    // Búsqueda incremental
-    function search(query) {
-      const q = norm(query);
-      if (!q) return [];
-
+    function search(q) {
+      const nq = norm(q);
+      if (!nq) return [];
       const all = [];
       for (const [key, meta] of idxByName.entries()) {
-        if (key.startsWith(q)) {
-          all.push({ key, ...meta, score: 0 }); // mayor prioridad
-        } else if (key.includes(q)) {
-          all.push({ key, ...meta, score: 1 });
-        }
+        if (key.startsWith(nq)) all.push({ key, ...meta, score: 0 });
+        else if (key.includes(nq)) all.push({ key, ...meta, score: 1 });
       }
-      // Orden: startsWith primero, luego por nombre
-      all.sort((a,b) => a.score - b.score || a.name.localeCompare(b.name, 'es'));
+      all.sort((a,b) => a.score - b.score || a.name.localeCompare(b.name,'es'));
       return all.slice(0, 12);
     }
 
-    // --- Callback global para Google Maps ---
-    window.initMap = function initMap() {
+    window.initMap = function() {
       map = new google.maps.Map(document.getElementById('map'), {
-        center: RM_CENTER,
-        zoom: RM_ZOOM,
+        center: { lat: -33.45, lng: -70.66 },
+        zoom: 9,
         mapTypeControl: false,
         streetViewControl: false,
         fullscreenControl: true,
-        clickableIcons: false,
-        gestureHandling: 'greedy',
-        styles: [
-          { featureType: 'poi', stylers: [{ visibility: 'off' }] },
-          { featureType: 'transit', stylers: [{ visibility: 'off' }] }
-        ]
+        clickableIcons: false
       });
-
-      // Estilo base
       map.data.setStyle(styleFeature);
 
-      // Eventos de UI
-      map.data.addListener('mouseover', (e) => {
-        const name = getComunaName(e.feature);
-        $('#chip').textContent = name;
-        // borde al pasar
-        e.feature.setProperty('hover', true);
-        map.data.overrideStyle(e.feature, {
-          strokeWeight: e.feature.getProperty('isHighlighted') ? 3 : 2.2,
-          fillOpacity: e.feature.getProperty('isHighlighted') ? 0.32 : 0.20
-        });
+      map.data.addListener('mouseover', e => {
+        document.getElementById('chip').textContent = comunaName(e.feature);
       });
-
-      map.data.addListener('mouseout', (e) => {
-        const txt = highlighted ? getComunaName(highlighted) : 'Pasa el mouse por una comuna o búscala arriba.';
-        $('#chip').textContent = txt;
-        map.data.revertStyle(e.feature);
+      map.data.addListener('mouseout', e => {
+        document.getElementById('chip').textContent = highlighted ? comunaName(highlighted) : 'Selecciona una comuna';
       });
-
-      map.data.addListener('dblclick', (e) => {
+      map.data.addListener('dblclick', e => {
         highlight(e.feature);
         fitFeature(e.feature);
-        const name = getComunaName(e.feature);
-        const provincia = getProvinciaName(e.feature);
-        $('#q').value = name;
-        $('#chip').textContent = `${name}${provincia ? `, ${provincia}` : ''}`;
+        document.getElementById('q').value = comunaName(e.feature);
+        document.getElementById('chip').textContent = comunaName(e.feature);
       });
 
-      // Cargar GeoJSON y filtrar RM
-      $('#chip').textContent = 'Cargando límites comunales…';
       map.data.loadGeoJson(GEOJSON_URL, null, () => {
-        // Filtra solo codregion 13 (aceptando string/number) o Region textual
-        const toRemove = [];
-        map.data.forEach((f) => {
-          const cr = getCodRegion(f);
-          const keep =
-            cr === 13 ||
-            cr === '13' ||
-            /metropolitana/i.test(String(f.getProperty('Region') || f.getProperty('REGION') || ''));
-          if (!keep) toRemove.push(f);
-        });
-        toRemove.forEach(f => map.data.remove(f));
-
-        // Indexar y setear estado inicial
-        map.data.forEach((f) => indexFeature(f));
-        $('#chip').textContent = 'RM lista. Busca una comuna o haz doble clic sobre el mapa.';
-
-        // Si llega ?q=las%20condes en la URL, selecciona
-        const qParam = params.get('q');
-        if (qParam) {
-          const hits = search(qParam);
-          if (hits.length) selectByKey(hits[0].key);
-        }
+        map.data.forEach(f => buildIndex(f));
+        document.getElementById('chip').textContent = 'Mapa listo.';
       });
 
-      // Search listeners
-      const input = $('#q');
-      const box = $('#suggestions');
-
-      input.addEventListener('input', () => {
-        const q = input.value;
-        const items = search(q);
-        renderSuggestions(items);
-      });
-
-      input.addEventListener('keydown', (e) => {
+      const input = document.getElementById('q');
+      const box = document.getElementById('suggestions');
+      input.addEventListener('input', () => renderSuggestions(search(input.value)));
+      input.addEventListener('keydown', e => {
         if (e.key === 'Enter') {
-          const items = search(input.value);
-          if (items.length) {
-            selectByKey(items[0].key);
-            e.preventDefault();
-          } else {
-            box.classList.remove('visible');
-          }
-        } else if (e.key === 'Escape') {
-          box.classList.remove('visible');
-        }
+          const hits = search(input.value);
+          if (hits.length) selectByKey(hits[0].key);
+        } else if (e.key === 'Escape') box.classList.remove('visible');
       });
-
-      document.addEventListener('click', (e) => {
-        if (!e.target.closest('.toolbar')) {
-          box.classList.remove('visible');
-        }
+      document.addEventListener('click', e => {
+        if (!e.target.closest('.toolbar')) box.classList.remove('visible');
       });
     };
+
+    if (API_KEY) {
+      const s = document.createElement('script');
+      s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(API_KEY)}&callback=initMap`;
+      s.async = true; s.defer = true;
+      document.head.appendChild(s);
+    } else {
+      document.getElementById('chip').textContent = 'Falta api_key en el iframe (?api_key=)';
+    }
   </script>
 </body>
 </html>
