@@ -1,8 +1,20 @@
 <?php
+/**
+ * Plugin deactivation handler.
+ *
+ * @package Politeia
+ */
 namespace Politeia\Core;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 class Deactivator {
-    public static function deactivate(): void {
-        // Limpia cron jobs, transients, etc. (no borres datos aquí)
-    }
+	/**
+	 * Run on plugin deactivation.
+	 */
+	public static function deactivate(): void {
+		flush_rewrite_rules( false );
+	}
 }
