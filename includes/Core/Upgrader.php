@@ -1,4 +1,5 @@
 <?php
+// phpcs:ignoreFile WordPress.Files.FileName.NotHyphenatedLowercase,WordPress.Files.FileName.InvalidClassFileName
 /**
  * Runs database schema upgrades when version changes.
  *
@@ -39,13 +40,14 @@ class Upgrader {
 		);
 
 		$missing = false;
-		foreach ( $required as $table ) {
-				$like = $wpdb->esc_like( $table );
-			if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $like ) ) !== $table ) {
-						$missing = true;
-						break;
-			}
-		}
+               foreach ( $required as $table ) {
+                       $like = $wpdb->esc_like( $table );
+                       // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+                       if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $like ) ) !== $table ) {
+                               $missing = true;
+                               break;
+                       }
+               }
 
 		if ( $missing || PLEM_DB_VERSION !== $stored ) {
 			Installer::install();
