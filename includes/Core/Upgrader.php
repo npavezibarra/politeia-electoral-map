@@ -1,4 +1,5 @@
 <?php
+// phpcs:ignoreFile WordPress.Files.FileName.NotHyphenatedLowercase,WordPress.Files.FileName.InvalidClassFileName
 /**
  * Runs database schema upgrades when version changes.
  *
@@ -39,8 +40,12 @@ class Upgrader {
 		);
 
 		$missing = false;
+
 		foreach ( $required as $table ) {
-			if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) !== $table ) {
+			$like = $wpdb->esc_like( $table );
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$found = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $like ) );
+			if ( $found !== $table ) {
 				$missing = true;
 				break;
 			}

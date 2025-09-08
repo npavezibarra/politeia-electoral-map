@@ -3,7 +3,7 @@
  * Plugin Name:       Politeia Electoral Map
  * Plugin URI:        https://github.com/npavezibarra/politeia-electoral-map
  * Description:       Visualizador electoral de Chile (mapas + datos). Paso 1: mapa en iframe con búsqueda de comunas RM.
- * Version:           0.2.1
+ * Version:           0.2.3
  * Author:            Politeia
  * Author URI:        https://politeia.cl
  * License:           GPL-2.0-or-later
@@ -31,10 +31,10 @@ if ( ! defined( 'PLEM_URL' ) ) {
 	define( 'PLEM_URL', plugin_dir_url( __FILE__ ) );
 }
 if ( ! defined( 'PLEM_VER' ) ) {
-		define( 'PLEM_VER', '0.2.1' );
+	define( 'PLEM_VER', '0.2.3' );
 }
 if ( ! defined( 'PLEM_DB_VERSION' ) ) {
-		define( 'PLEM_DB_VERSION', '0.2.1' );
+	define( 'PLEM_DB_VERSION', '0.2.3' );
 }
 
 // ======================================================
@@ -72,16 +72,16 @@ if ( file_exists( $shortcode_file ) ) {
  */
 $assets_file = PLEM_DIR . 'includes/Modules/Assets/Assets.php';
 if ( file_exists( $assets_file ) ) {
-		require_once $assets_file;
+	require_once $assets_file;
 }
 
 /**
  * REST controller para obtener información de comunas.
- * Ruta: includes/Modules/REST/Jurisdictions.php
+ * Ruta: includes/Modules/REST/class-jurisdictions.php
  */
 $rest_juris_file = PLEM_DIR . 'includes/Modules/REST/class-jurisdictions.php';
 if ( file_exists( $rest_juris_file ) ) {
-		require_once $rest_juris_file;
+	require_once $rest_juris_file;
 }
 
 // ======================================================
@@ -101,7 +101,7 @@ add_action( 'plugins_loaded', array( '\Politeia\Core\Upgrader', 'maybe_upgrade' 
  * @return void
  */
 function plem_load_textdomain() {
-		load_plugin_textdomain( 'politeia-electoral-map', false, dirname( plugin_basename( PLEM_FILE ) ) . '/languages' );
+	load_plugin_textdomain( 'politeia-electoral-map', false, dirname( plugin_basename( PLEM_FILE ) ) . '/languages' );
 }
 add_action( 'plugins_loaded', 'plem_load_textdomain' );
 
@@ -118,7 +118,8 @@ function plem_admin_notice_missing_api_key() {
 	}
 
 	$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
-		// Evita saturar todas las pantallas: muestra en Escritorio y en la página del plugin.
+
+	// Evita saturar todas las pantallas: muestra en Escritorio y en la página del plugin.
 	$show = true;
 	if ( $screen && isset( $screen->id ) ) {
 		$show = in_array( $screen->id, array( 'dashboard', 'toplevel_page_plem-settings' ), true );
