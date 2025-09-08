@@ -47,6 +47,12 @@
       margin: 0; padding: 10px 12px; font-size: 18px; text-align: left;
     }
 
+    #info .content {
+      padding: 0 12px 12px;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
     .hint { font-size: 12px; color: #6b7280; text-align: center; text-shadow: 0 1px 2px rgba(255,255,255,.8); }
   </style>
 </head>
@@ -63,7 +69,7 @@
     </div>
 
     <div id="chip" class="chip">Cargando mapa…</div>
-    <div id="info"><h2></h2><hr /></div>
+    <div id="info"><h2></h2><hr /><div class="content"></div></div>
   </div>
 
   <script>
@@ -108,10 +114,33 @@
       map.data.setStyle(styleFeature);
     }
 
-    function showInfo(name) {
+    async function showInfo(name) {
       const box = document.getElementById('info');
       const h2 = box.querySelector('h2');
       if (h2 && name) h2.textContent = name.toUpperCase();
+
+      const content = box.querySelector('.content');
+      if (content) {
+        content.innerHTML = '';
+        try {
+          const res = await fetch(`/wp-json/politeia/v1/jurisdictions?name=${encodeURIComponent(name)}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.found && data.person_name) {
+              content.innerHTML = `
+                <div>${data.person_name}</div>
+                <div>${data.office_title || ''}</div>
+                ${data.started_on ? `<div>Desde ${data.started_on}</div>` : ''}`;
+            } else {
+              content.innerHTML = '<div>No hay datos disponibles.</div>';
+            }
+          } else {
+            content.innerHTML = '<div>Error al cargar datos.</div>';
+          }
+        } catch (e) {
+          content.innerHTML = '<div>Error al cargar datos.</div>';
+        }
+      }
       box.style.display = 'block';
     }
 
