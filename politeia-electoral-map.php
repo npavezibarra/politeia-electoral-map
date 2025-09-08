@@ -90,7 +90,7 @@ if ( file_exists( $rest_juris_file ) ) {
 
 register_activation_hook( PLEM_FILE, array( '\Politeia\Core\Activator', 'activate' ) );
 register_deactivation_hook( PLEM_FILE, array( '\Politeia\Core\Deactivator', 'deactivate' ) );
-add_action( 'admin_init', array( '\Politeia\Core\Upgrader', 'maybe_upgrade' ) );
+add_action( 'plugins_loaded', array( '\Politeia\Core\Upgrader', 'maybe_upgrade' ) );
 
 // ======================================================
 // Internacionalización (por si luego agregas strings traducibles)
