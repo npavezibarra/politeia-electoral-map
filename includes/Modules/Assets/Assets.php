@@ -15,8 +15,8 @@ class Assets {
 		$base_url = \PLEM_URL;
 
 		// Ejemplos de enqueue (ajusta si no tienes estos archivos aún)
-		// wp_enqueue_style('plem-map', $base_url . 'assets/css/map.css', [], \PLEM_VER);
-		// wp_enqueue_script('plem-frontend', $base_url . 'assets/js/frontend.js', [], \PLEM_VER, true);
+                // wp_enqueue_style('plem-map', $base_url . 'assets/css/map.css', [], \PLEM_VERSION);
+                // wp_enqueue_script('plem-frontend', $base_url . 'assets/js/frontend.js', [], \PLEM_VERSION, true);
 	}
 
 	public function enqueue_admin($hook = '') {
@@ -24,7 +24,7 @@ class Assets {
 		// if ($hook !== 'toplevel_page_plem-settings') return;
 
 		$base_url = \PLEM_URL;
-		// wp_enqueue_style('plem-admin', $base_url . 'assets/css/admin.css', [], \PLEM_VER);
+                // wp_enqueue_style('plem-admin', $base_url . 'assets/css/admin.css', [], \PLEM_VERSION);
 	}
 }
 
