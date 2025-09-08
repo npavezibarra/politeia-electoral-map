@@ -36,18 +36,18 @@
       max-width: min(50vw, 420px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
 
-    /* Panel de información (200px x 70% alto) */
-    #info {
+    /* Panel de información (350px x 70% alto) */
+    #comune-info-card {
       position: absolute; top: 15%; left: 20px; z-index: 4;
-      width: 200px; height: 70%; background: #fff; display: none;
+      width: 350px; height: 70%; background: #fff; display: none;
       box-shadow: 0 6px 18px rgba(0,0,0,.10), 0 1px 4px rgba(0,0,0,.06);
       border-radius: 10px;
     }
-    #info h2 {
+    #comune-info-card h2 {
       margin: 0; padding: 10px 12px; font-size: 18px; text-align: left;
     }
 
-    #info .content {
+    #comune-info-card .content {
       padding: 0 12px 12px;
       font-size: 14px;
       line-height: 1.4;
@@ -69,7 +69,7 @@
     </div>
 
     <div id="chip" class="chip">Cargando mapa…</div>
-    <div id="info"><h2></h2><hr /><div class="content"></div></div>
+    <div id="comune-info-card"><h2></h2><hr /><div class="content"></div></div>
   </div>
 
   <script>
@@ -115,7 +115,7 @@
     }
 
     async function showInfo(name) {
-      const box = document.getElementById('info');
+      const box = document.getElementById('comune-info-card');
       const h2 = box.querySelector('h2');
       if (h2 && name) h2.textContent = name.toUpperCase();
 
