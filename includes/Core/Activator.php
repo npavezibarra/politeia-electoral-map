@@ -1,15 +1,27 @@
 <?php
+/**
+ * Plugin activation handler.
+ *
+ * @package Politeia
+ */
+
 namespace Politeia\Core;
 
 use Politeia\Modules\Database\Installer;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+/**
+ * Handles plugin activation.
+ */
 class Activator {
-    public static function activate(): void {
-        // Instala DB si el módulo existe
-        if (class_exists(Installer::class)) {
-            (new Installer())->install();
-        }
-        // Guarda versión instalada
-        update_option('politeia-electoral-map_version', POLITEIAELECTORALMAP_VER);
-    }
+	/**
+	 * Run on plugin activation.
+	 */
+	public static function activate(): void {
+		Installer::install();
+		flush_rewrite_rules( false );
+	}
 }
