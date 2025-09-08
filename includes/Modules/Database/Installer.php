@@ -1,4 +1,10 @@
 <?php
+/**
+ * Database schema installer for Politeia Electoral Map.
+ *
+ * @package Politeia
+ */
+
 namespace Politeia\Modules\Database;
 
 use wpdb;
@@ -7,11 +13,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-/**
- * Database schema installer for Politeia Electoral Map.
- *
- * @package Politeia
- */
 /**
  * Handles creation and updates of the plugin database tables.
  */
@@ -36,13 +37,17 @@ class Installer {
 	 * @return string
 	 */
 	public static function get_schema_sql( wpdb $wpdb ): string {
-		$collate           = $wpdb->get_charset_collate();
-		$people            = "{$wpdb->prefix}politeia_people";
-		$parties           = "{$wpdb->prefix}politeia_political_parties";
-		$jurisdictions     = "{$wpdb->prefix}politeia_jurisdictions";
-		$offices           = "{$wpdb->prefix}politeia_offices";
-		$office_terms      = "{$wpdb->prefix}politeia_office_terms";
-		$party_memberships = "{$wpdb->prefix}politeia_party_memberships";
+		$collate                          = $wpdb->get_charset_collate();
+		$people                           = "{$wpdb->prefix}politeia_people";
+		$parties                          = "{$wpdb->prefix}politeia_political_parties";
+		$jurisdictions                    = "{$wpdb->prefix}politeia_jurisdictions";
+				$offices                  = "{$wpdb->prefix}politeia_offices";
+				$office_terms             = "{$wpdb->prefix}politeia_office_terms";
+				$party_memberships        = "{$wpdb->prefix}politeia_party_memberships";
+				$jurisdiction_populations = "{$wpdb->prefix}politeia_jurisdiction_populations";
+				$jurisdiction_budgets     = "{$wpdb->prefix}politeia_jurisdiction_budgets";
+				$elections                = "{$wpdb->prefix}politeia_elections";
+				$candidacies              = "{$wpdb->prefix}politeia_candidacies";
 
 		return "
 CREATE TABLE $people (
@@ -108,6 +113,8 @@ CREATE TABLE $office_terms (
   jurisdiction_id BIGINT UNSIGNED NULL, -- nullable for nationwide roles
   started_on DATE NOT NULL,
   ended_on DATE NULL,                   -- NULL = current
+  planned_end_on DATE NULL,
+  status VARCHAR(16) NULL,
   is_acting TINYINT(1) NOT NULL DEFAULT 0,
   source_url VARCHAR(400) NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -130,6 +137,74 @@ CREATE TABLE $party_memberships (
   PRIMARY KEY (id),
   KEY idx_membership_person (person_id, started_on),
   KEY idx_membership_party (party_id, started_on)
+) ENGINE=InnoDB $collate;
+
+CREATE TABLE $jurisdiction_populations (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  jurisdiction_id BIGINT UNSIGNED NOT NULL,
+  year INT NOT NULL,
+  population INT NOT NULL,
+  method VARCHAR(16) NULL,
+  source VARCHAR(255) NULL,
+  source_url VARCHAR(400) NULL,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY ux_pop_jur_year (jurisdiction_id, year),
+  KEY idx_pop_jur (jurisdiction_id)
+) ENGINE=InnoDB $collate;
+
+CREATE TABLE $jurisdiction_budgets (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  jurisdiction_id BIGINT UNSIGNED NOT NULL,
+  fiscal_year INT NOT NULL,
+  amount_total DECIMAL(18,2) NOT NULL,
+  currency CHAR(3) NOT NULL DEFAULT 'CLP',
+  source VARCHAR(255) NULL,
+  source_url VARCHAR(400) NULL,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY ux_budget_jur_year (jurisdiction_id, fiscal_year),
+  KEY idx_budget_jur (jurisdiction_id)
+) ENGINE=InnoDB $collate;
+
+CREATE TABLE $elections (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  office_id BIGINT UNSIGNED NOT NULL,
+  jurisdiction_id BIGINT UNSIGNED NOT NULL,
+  election_date DATE NOT NULL,
+  name VARCHAR(200) NULL,
+  round_number INT NOT NULL DEFAULT 1,
+  seats INT NOT NULL DEFAULT 1,
+  system VARCHAR(40) NULL,
+  total_registered INT NULL,
+  total_votes INT NULL,
+  valid_votes INT NULL,
+  blank_votes INT NULL,
+  null_votes INT NULL,
+  source_url VARCHAR(400) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_elec_jur_office_date (jurisdiction_id, office_id, election_date)
+) ENGINE=InnoDB $collate;
+
+CREATE TABLE $candidacies (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  election_id BIGINT UNSIGNED NOT NULL,
+  person_id BIGINT UNSIGNED NOT NULL,
+  party_id BIGINT UNSIGNED NOT NULL,
+  alliance VARCHAR(120) NULL,
+  list_position INT NULL,
+  votes INT NULL,
+  vote_share DECIMAL(6,3) NULL,
+  elected TINYINT(1) NOT NULL DEFAULT 0,
+  rank INT NULL,
+  source_url VARCHAR(400) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_cand_election_votes (election_id, votes),
+  KEY idx_cand_election_elected (election_id, elected)
 ) ENGINE=InnoDB $collate;
 ";
 	}
