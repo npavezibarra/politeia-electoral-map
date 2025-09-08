@@ -35,15 +35,18 @@
       box-shadow: 0 6px 18px rgba(0,0,0,.10), 0 1px 4px rgba(0,0,0,.06);
       max-width: min(50vw, 420px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
-    #comune-infobox {
+
+    /* Panel de información (200px x 70% alto) */
+    #info {
       position: absolute; top: 15%; left: 20px; z-index: 4;
       width: 200px; height: 70%; background: #fff; display: none;
       box-shadow: 0 6px 18px rgba(0,0,0,.10), 0 1px 4px rgba(0,0,0,.06);
+      border-radius: 10px;
     }
-    #comune-infobox h2 {
-      margin: 0; padding: 10px 12px; font-size: 18px;
-      text-align: left;
+    #info h2 {
+      margin: 0; padding: 10px 12px; font-size: 18px; text-align: left;
     }
+
     .hint { font-size: 12px; color: #6b7280; text-align: center; text-shadow: 0 1px 2px rgba(255,255,255,.8); }
   </style>
 </head>
@@ -60,14 +63,14 @@
     </div>
 
     <div id="chip" class="chip">Cargando mapa…</div>
-    <div id="comune-infobox"><h2></h2><hr /></div>
+    <div id="info"><h2></h2><hr /></div>
   </div>
 
   <script>
     // --- Parámetros y rutas ---
     const params = new URLSearchParams(location.search);
     const API_KEY = params.get('api_key') || '';
-    const GEOJSON_URL = '../geojson/comunas_rm_oficial_wgs84.geojson'; // ya solo RM en WGS84
+    const GEOJSON_URL = '../geojson/comunas_rm_oficial_wgs84.geojson';
 
     // --- Estado ---
     let map, highlighted = null;
@@ -106,8 +109,9 @@
     }
 
     function showInfo(name) {
-      const box = document.getElementById('comune-infobox');
-      box.querySelector('h2').textContent = name.toUpperCase();
+      const box = document.getElementById('info');
+      const h2 = box.querySelector('h2');
+      if (h2 && name) h2.textContent = name.toUpperCase();
       box.style.display = 'block';
     }
 
@@ -124,11 +128,11 @@
       // 1) Ajusta a los límites
       map.fitBounds(bounds, padding);
 
-      // 2) Cuando el mapa termina de ajustar, aplica panBy para desplazar el "punto medio"
+      // 2) Cuando termina, desplaza para dejar la comuna en ~2/3 der.
       google.maps.event.addListenerOnce(map, 'idle', () => {
         const div = map.getDiv();
         const w = div.clientWidth, h = div.clientHeight;
-        const panX = (0.5 - xRatio) * w; // xRatio=2/3 -> panX negativo (centro se mueve hacia la izq, dejando comuna en 2/3 der)
+        const panX = (0.5 - xRatio) * w;
         const panY = (0.5 - yRatio) * h;
         map.panBy(panX, panY);
         if (typeof onDone === 'function') {
@@ -187,10 +191,11 @@
       map.data.addListener('mouseover', e => { document.getElementById('chip').textContent = comunaName(e.feature); });
       map.data.addListener('mouseout',  e => { document.getElementById('chip').textContent = highlighted ? comunaName(highlighted) : 'Selecciona una comuna'; });
       map.data.addListener('dblclick',  e => {
+        const name = comunaName(e.feature);
         highlight(e.feature);
-        fitFeatureWithOffset(e.feature, { xRatio: 2/3, yRatio: 0.5, onDone: () => showInfo(comunaName(e.feature)) });
-        document.getElementById('q').value = comunaName(e.feature);
-        document.getElementById('chip').textContent = comunaName(e.feature);
+        fitFeatureWithOffset(e.feature, { xRatio: 2/3, yRatio: 0.5, onDone: () => showInfo(name) });
+        document.getElementById('q').value = name;
+        document.getElementById('chip').textContent = name;
       });
 
       map.data.loadGeoJson(GEOJSON_URL, null, () => {
