@@ -35,6 +35,15 @@
       box-shadow: 0 6px 18px rgba(0,0,0,.10), 0 1px 4px rgba(0,0,0,.06);
       max-width: min(50vw, 420px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
+    #comune-infobox {
+      position: absolute; top: 15%; left: 20px; z-index: 4;
+      width: 200px; height: 70%; background: #fff; display: none;
+      box-shadow: 0 6px 18px rgba(0,0,0,.10), 0 1px 4px rgba(0,0,0,.06);
+    }
+    #comune-infobox h2 {
+      margin: 0; padding: 10px 12px; font-size: 18px;
+      text-align: left;
+    }
     .hint { font-size: 12px; color: #6b7280; text-align: center; text-shadow: 0 1px 2px rgba(255,255,255,.8); }
   </style>
 </head>
@@ -51,6 +60,7 @@
     </div>
 
     <div id="chip" class="chip">Cargando mapa…</div>
+    <div id="comune-infobox"><h2></h2><hr /></div>
   </div>
 
   <script>
@@ -95,11 +105,18 @@
       map.data.setStyle(styleFeature);
     }
 
+    function showInfo(name) {
+      const box = document.getElementById('comune-infobox');
+      box.querySelector('h2').textContent = name.toUpperCase();
+      box.style.display = 'block';
+    }
+
     // --- Fit con offset a "2/3 derecha" (configurable) ---
     function fitFeatureWithOffset(feature, {
       padding = { top: 80, right: 20, bottom: 20, left: 20 },
       xRatio = 2/3,   // 0 = borde izq … 0.5 = centro … 1 = borde der
-      yRatio = 0.5    // 0 = arriba … 0.5 = centro … 1 = abajo
+      yRatio = 0.5,   // 0 = arriba … 0.5 = centro … 1 = abajo
+      onDone = null
     } = {}) {
       const bounds = new google.maps.LatLngBounds();
       feature.getGeometry().forEachLatLng(p => bounds.extend(p));
@@ -114,6 +131,9 @@
         const panX = (0.5 - xRatio) * w; // xRatio=2/3 -> panX negativo (centro se mueve hacia la izq, dejando comuna en 2/3 der)
         const panY = (0.5 - yRatio) * h;
         map.panBy(panX, panY);
+        if (typeof onDone === 'function') {
+          google.maps.event.addListenerOnce(map, 'idle', onDone);
+        }
       });
     }
 
@@ -138,7 +158,7 @@
       const hit = idxByName.get(key);
       if (!hit) return;
       highlight(hit.feature);
-      fitFeatureWithOffset(hit.feature, { xRatio: 2/3, yRatio: 0.5 }); // <-- CORREGIDO
+      fitFeatureWithOffset(hit.feature, { xRatio: 2/3, yRatio: 0.5, onDone: () => showInfo(hit.name) });
       document.getElementById('q').value = hit.name;
       document.getElementById('chip').textContent = hit.name;
       document.getElementById('suggestions').classList.remove('visible');
@@ -168,7 +188,7 @@
       map.data.addListener('mouseout',  e => { document.getElementById('chip').textContent = highlighted ? comunaName(highlighted) : 'Selecciona una comuna'; });
       map.data.addListener('dblclick',  e => {
         highlight(e.feature);
-        fitFeatureWithOffset(e.feature, { xRatio: 2/3, yRatio: 0.5 });   // <-- CORREGIDO
+        fitFeatureWithOffset(e.feature, { xRatio: 2/3, yRatio: 0.5, onDone: () => showInfo(comunaName(e.feature)) });
         document.getElementById('q').value = comunaName(e.feature);
         document.getElementById('chip').textContent = comunaName(e.feature);
       });
