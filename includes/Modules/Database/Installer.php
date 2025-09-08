@@ -170,8 +170,9 @@ class Installer {
   KEY idx_budget_jur (jurisdiction_id)
 ) ENGINE=InnoDB $collate;",
 
-			"CREATE TABLE $elections (
+                        "CREATE TABLE $elections (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  event_id BIGINT UNSIGNED NULL,
   office_id BIGINT UNSIGNED NOT NULL,
   jurisdiction_id BIGINT UNSIGNED NOT NULL,
   election_date DATE NOT NULL,
