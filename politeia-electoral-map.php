@@ -10,6 +10,8 @@
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain:       politeia-electoral-map
  * Domain Path:       /languages
+ *
+ * @package PoliteiaElectoralMap
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -70,7 +72,16 @@ if ( file_exists( $shortcode_file ) ) {
  */
 $assets_file = PLEM_DIR . 'includes/Modules/Assets/Assets.php';
 if ( file_exists( $assets_file ) ) {
-	require_once $assets_file;
+		require_once $assets_file;
+}
+
+/**
+ * REST controller para obtener información de comunas.
+ * Ruta: includes/Modules/REST/Jurisdictions.php
+ */
+$rest_juris_file = PLEM_DIR . 'includes/Modules/REST/class-jurisdictions.php';
+if ( file_exists( $rest_juris_file ) ) {
+		require_once $rest_juris_file;
 }
 
 // ======================================================
@@ -84,8 +95,13 @@ add_action( 'admin_init', array( '\Politeia\Core\Upgrader', 'maybe_upgrade' ) );
 // ======================================================
 // Internacionalización (por si luego agregas strings traducibles)
 // ======================================================
+/**
+ * Load plugin text domain.
+ *
+ * @return void
+ */
 function plem_load_textdomain() {
-	load_plugin_textdomain( 'politeia-electoral-map', false, dirname( plugin_basename( PLEM_FILE ) ) . '/languages' );
+		load_plugin_textdomain( 'politeia-electoral-map', false, dirname( plugin_basename( PLEM_FILE ) ) . '/languages' );
 }
 add_action( 'plugins_loaded', 'plem_load_textdomain' );
 
@@ -102,7 +118,7 @@ function plem_admin_notice_missing_api_key() {
 	}
 
 	$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
-	// Evita saturar todas las pantallas: muestra en Escritorio y en la página del plugin
+		// Evita saturar todas las pantallas: muestra en Escritorio y en la página del plugin.
 	$show = true;
 	if ( $screen && isset( $screen->id ) ) {
 		$show = in_array( $screen->id, array( 'dashboard', 'toplevel_page_plem-settings' ), true );
