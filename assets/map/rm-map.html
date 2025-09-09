@@ -44,7 +44,7 @@
       border-radius: 10px; overflow: hidden;
     }
     #INFOCARD-HEADER, #INFOCARD-COMMUNE {
-      padding: 10px 12px;
+      padding: 20px;
       font-size: 14px;
       line-height: 1.4;
     }
@@ -56,7 +56,7 @@
       align-items: center;
       justify-content: center;
       gap: 12px;
-      margin-bottom: 8px;
+      margin-bottom: 20px;
     }
     #info-mayor-photo {
       width: 80px;
@@ -72,10 +72,16 @@
     }
     #info-term {
       text-align: center;
+      margin-bottom: 20px;
     }
     #info-term-dates {
       display: flex;
       justify-content: space-between;
+      font-size: 10px;
+    }
+    #info-term-label {
+      font-size: 10px;
+      letter-spacing: 4px;
     }
     #info-header-name {
       font-size: 28px;
@@ -105,7 +111,6 @@
       <div id="INFOCARD-HEADER">
         <div id="info-header-type">Comuna</div>
         <div id="info-header-name"></div>
-        <div id="info-header-official"></div>
       </div>
       <div id="INFOCARD-COMMUNE">
         <div id="info-mayor">
@@ -174,7 +179,6 @@
     async function showInfo(name) {
       const box = document.getElementById('comune-info-card');
       const headerName = document.getElementById('info-header-name');
-      const headerOfficial = document.getElementById('info-header-official');
       const mayorName = document.getElementById('info-mayor-name');
       const officeParty = document.getElementById('info-office-party');
       const termStart = document.getElementById('info-term-start');
@@ -184,7 +188,6 @@
       const budgetEl = document.getElementById('info-budget');
 
       if (headerName) headerName.textContent = name;
-      if (headerOfficial) headerOfficial.textContent = '';
       if (mayorName) mayorName.textContent = '';
       if (officeParty) officeParty.textContent = '';
       if (termStart) termStart.textContent = '';
@@ -199,7 +202,6 @@
           const data = await res.json();
           if (data.found) {
             if (headerName && data.common_name) headerName.textContent = data.common_name;
-            if (headerOfficial) headerOfficial.textContent = data.jurisdiction_name || '';
             if (mayorName) mayorName.textContent = data.person_name || '';
             if (officeParty) {
               const parts = [];
