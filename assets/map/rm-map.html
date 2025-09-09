@@ -51,15 +51,38 @@
     #INFOCARD-HEADER {
       border-bottom: 1px solid rgba(0,0,0,.1);
     }
+    #info-mayor {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
     #info-mayor-photo {
-      width: 80px; height: 80px; border-radius: 50%; object-fit: cover;
-      display: none;
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: #d1d5db;
     }
     #info-term-bar {
       width: 100%; height: 6px; background: #e5e7eb; border-radius: 4px; overflow: hidden; margin: 4px 0;
     }
     #info-term-progress {
       height: 100%; background: #3b82f6; width: 0%;
+    }
+    #info-term {
+      text-align: center;
+    }
+    #info-term-dates {
+      display: flex;
+      justify-content: space-between;
+    }
+    #info-header-name {
+      font-size: 28px;
+      font-weight: 700;
+    }
+    #info-mayor-name {
+      font-size: 20px;
     }
 
     .hint { font-size: 12px; color: #6b7280; text-align: center; text-shadow: 0 1px 2px rgba(255,255,255,.8); }
@@ -85,9 +108,13 @@
         <div id="info-header-official"></div>
       </div>
       <div id="INFOCARD-COMMUNE">
-        <img id="info-mayor-photo" alt="" />
-        <div id="info-mayor-name"></div>
-        <div id="info-office-party"></div>
+        <div id="info-mayor">
+          <div id="info-mayor-photo"></div>
+          <div id="info-mayor-details">
+            <div id="info-mayor-name"></div>
+            <div id="info-office-party"></div>
+          </div>
+        </div>
         <div id="info-term">
           <div id="info-term-label">PERÍODO</div>
           <div id="info-term-bar"><div id="info-term-progress"></div></div>
@@ -148,7 +175,6 @@
       const box = document.getElementById('comune-info-card');
       const headerName = document.getElementById('info-header-name');
       const headerOfficial = document.getElementById('info-header-official');
-      const mayorPhoto = document.getElementById('info-mayor-photo');
       const mayorName = document.getElementById('info-mayor-name');
       const officeParty = document.getElementById('info-office-party');
       const termStart = document.getElementById('info-term-start');
@@ -159,7 +185,6 @@
 
       if (headerName) headerName.textContent = name;
       if (headerOfficial) headerOfficial.textContent = '';
-      if (mayorPhoto) { mayorPhoto.style.display = 'none'; mayorPhoto.src = ''; }
       if (mayorName) mayorName.textContent = '';
       if (officeParty) officeParty.textContent = '';
       if (termStart) termStart.textContent = '';
@@ -175,14 +200,6 @@
           if (data.found) {
             if (headerName && data.common_name) headerName.textContent = data.common_name;
             if (headerOfficial) headerOfficial.textContent = data.jurisdiction_name || '';
-            if (mayorPhoto) {
-              if (data.photo_url) {
-                mayorPhoto.src = data.photo_url;
-                mayorPhoto.style.display = 'block';
-              } else {
-                mayorPhoto.style.display = 'none';
-              }
-            }
             if (mayorName) mayorName.textContent = data.person_name || '';
             if (officeParty) {
               const parts = [];
