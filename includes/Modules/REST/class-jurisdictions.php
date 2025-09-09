@@ -48,15 +48,16 @@ class Jurisdictions extends Controller {
 			return new WP_REST_Response( array( 'found' => false ), 200 );
 		}
 
-				$jurisdictions     = $wpdb->prefix . 'politeia_jurisdictions';
-				$terms             = $wpdb->prefix . 'politeia_office_terms';
-				$people            = $wpdb->prefix . 'politeia_people';
-				$offices           = $wpdb->prefix . 'politeia_offices';
-				$party_memberships = $wpdb->prefix . 'politeia_party_memberships';
-				$parties           = $wpdb->prefix . 'politeia_political_parties';
-				$budgets           = $wpdb->prefix . 'politeia_jurisdiction_budgets';
-				$elections         = $wpdb->prefix . 'politeia_elections';
-				$candidacies       = $wpdb->prefix . 'politeia_candidacies';
+		$jurisdictions     = $wpdb->prefix . 'politeia_jurisdictions';
+		$terms             = $wpdb->prefix . 'politeia_office_terms';
+		$people            = $wpdb->prefix . 'politeia_people';
+		$offices           = $wpdb->prefix . 'politeia_offices';
+		$party_memberships = $wpdb->prefix . 'politeia_party_memberships';
+		$parties           = $wpdb->prefix . 'politeia_political_parties';
+		$budgets           = $wpdb->prefix . 'politeia_jurisdiction_budgets';
+		$populations       = $wpdb->prefix . 'politeia_jurisdiction_populations';
+		$elections         = $wpdb->prefix . 'politeia_elections';
+		$candidacies       = $wpdb->prefix . 'politeia_candidacies';
 
         /* phpcs:disable WordPress.DB.PreparedSQL.NotPrepared */
 				$query = "SELECT j.official_name AS jurisdiction_name,
@@ -68,7 +69,8 @@ class Jurisdictions extends Controller {
                     t.started_on,
                     t.planned_end_on,
                     (SELECT c.votes FROM %s c INNER JOIN %s e ON e.id = c.election_id WHERE c.person_id = t.person_id AND e.jurisdiction_id = j.id AND e.office_id = t.office_id ORDER BY e.election_date DESC LIMIT 1) AS votes,
-                    (SELECT b.amount_total FROM %s b WHERE b.jurisdiction_id = j.id ORDER BY b.fiscal_year DESC LIMIT 1) AS budget
+                    (SELECT b.amount_total FROM %s b WHERE b.jurisdiction_id = j.id ORDER BY b.fiscal_year DESC LIMIT 1) AS budget,
+                    (SELECT pop.population FROM %s pop WHERE pop.jurisdiction_id = j.id ORDER BY pop.year DESC LIMIT 1) AS population
              FROM %s j
              LEFT JOIN %s t ON t.jurisdiction_id = j.id AND t.ended_on IS NULL
              LEFT JOIN %s p ON p.id = t.person_id
@@ -84,6 +86,7 @@ class Jurisdictions extends Controller {
 						$candidacies,
 						$elections,
 						$budgets,
+						$populations,
 						$jurisdictions,
 						$terms,
 						$people,
@@ -113,6 +116,7 @@ class Jurisdictions extends Controller {
 						'started_on'        => $row['started_on'],
 						'planned_end_on'    => $row['planned_end_on'],
 						'votes'             => $row['votes'],
+						'population'        => $row['population'],
 						'budget'            => $row['budget'],
 					),
 					200

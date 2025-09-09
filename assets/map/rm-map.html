@@ -128,7 +128,11 @@
             <span id="info-term-end"></span>
           </div>
         </div>
+        <hr />
         <div id="info-votes"></div>
+        <hr />
+        <div id="info-population"></div>
+        <hr />
         <div id="info-budget"></div>
       </div>
     </div>
@@ -185,6 +189,7 @@
       const termEnd = document.getElementById('info-term-end');
       const termProgress = document.getElementById('info-term-progress');
       const votesEl = document.getElementById('info-votes');
+      const populationEl = document.getElementById('info-population');
       const budgetEl = document.getElementById('info-budget');
 
       if (headerName) headerName.textContent = name;
@@ -194,6 +199,7 @@
       if (termEnd) termEnd.textContent = '';
       if (termProgress) termProgress.style.width = '0%';
       if (votesEl) votesEl.textContent = '';
+      if (populationEl) populationEl.textContent = '';
       if (budgetEl) budgetEl.textContent = '';
 
       try {
@@ -220,6 +226,9 @@
             }
             if (votesEl && data.votes !== null && data.votes !== undefined) {
               votesEl.textContent = `${Number(data.votes).toLocaleString('es-CL')} votos`;
+            }
+            if (populationEl && data.population !== null && data.population !== undefined) {
+              populationEl.textContent = `Población: ${Number(data.population).toLocaleString('es-CL')}`;
             }
             if (budgetEl && data.budget !== null && data.budget !== undefined) {
               budgetEl.textContent = `Presupuesto Anual Municipal: $${Number(data.budget).toLocaleString('es-CL')}`;
