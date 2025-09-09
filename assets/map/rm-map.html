@@ -36,21 +36,30 @@
       max-width: min(50vw, 420px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
 
-    /* Panel de información (350px x 70% alto) */
+    /* Panel de información (350px width, auto height) */
     #comune-info-card {
       position: absolute; top: 15%; left: 20px; z-index: 4;
-      width: 350px; height: 70%; background: #fff; display: none;
+      width: 350px; background: #fff; display: none;
       box-shadow: 0 6px 18px rgba(0,0,0,.10), 0 1px 4px rgba(0,0,0,.06);
-      border-radius: 10px;
+      border-radius: 10px; overflow: hidden;
     }
-    #comune-info-card h2 {
-      margin: 0; padding: 10px 12px; font-size: 18px; text-align: left;
-    }
-
-    #comune-info-card .content {
-      padding: 0 12px 12px;
+    #INFOCARD-HEADER, #INFOCARD-COMMUNE {
+      padding: 10px 12px;
       font-size: 14px;
       line-height: 1.4;
+    }
+    #INFOCARD-HEADER {
+      border-bottom: 1px solid rgba(0,0,0,.1);
+    }
+    #info-mayor-photo {
+      width: 80px; height: 80px; border-radius: 50%; object-fit: cover;
+      display: none;
+    }
+    #info-term-bar {
+      width: 100%; height: 6px; background: #e5e7eb; border-radius: 4px; overflow: hidden; margin: 4px 0;
+    }
+    #info-term-progress {
+      height: 100%; background: #3b82f6; width: 0%;
     }
 
     .hint { font-size: 12px; color: #6b7280; text-align: center; text-shadow: 0 1px 2px rgba(255,255,255,.8); }
@@ -69,7 +78,28 @@
     </div>
 
     <div id="chip" class="chip">Cargando mapa…</div>
-    <div id="comune-info-card"><h2></h2><hr /><div class="content"></div></div>
+    <div id="comune-info-card">
+      <div id="INFOCARD-HEADER">
+        <div id="info-header-type">Comuna</div>
+        <div id="info-header-name"></div>
+        <div id="info-header-official"></div>
+      </div>
+      <div id="INFOCARD-COMMUNE">
+        <img id="info-mayor-photo" alt="" />
+        <div id="info-mayor-name"></div>
+        <div id="info-office-party"></div>
+        <div id="info-term">
+          <div id="info-term-label">PERÍODO</div>
+          <div id="info-term-bar"><div id="info-term-progress"></div></div>
+          <div id="info-term-dates">
+            <span id="info-term-start"></span>
+            <span id="info-term-end"></span>
+          </div>
+        </div>
+        <div id="info-votes"></div>
+        <div id="info-budget"></div>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -116,31 +146,75 @@
 
     async function showInfo(name) {
       const box = document.getElementById('comune-info-card');
-      const h2 = box.querySelector('h2');
-      if (h2 && name) h2.textContent = name.toUpperCase();
+      const headerName = document.getElementById('info-header-name');
+      const headerOfficial = document.getElementById('info-header-official');
+      const mayorPhoto = document.getElementById('info-mayor-photo');
+      const mayorName = document.getElementById('info-mayor-name');
+      const officeParty = document.getElementById('info-office-party');
+      const termStart = document.getElementById('info-term-start');
+      const termEnd = document.getElementById('info-term-end');
+      const termProgress = document.getElementById('info-term-progress');
+      const votesEl = document.getElementById('info-votes');
+      const budgetEl = document.getElementById('info-budget');
 
-      const content = box.querySelector('.content');
-      if (content) {
-        content.innerHTML = '';
-        try {
-          const res = await fetch(`/wp-json/politeia/v1/jurisdictions?name=${encodeURIComponent(name)}`);
-          if (res.ok) {
-            const data = await res.json();
-            if (data.found && data.person_name) {
-              content.innerHTML = `
-                <div>${data.person_name}</div>
-                <div>${data.office_title || ''}</div>
-                ${data.started_on ? `<div>Desde ${data.started_on}</div>` : ''}`;
-            } else {
-              content.innerHTML = '<div>No hay datos disponibles.</div>';
+      if (headerName) headerName.textContent = name;
+      if (headerOfficial) headerOfficial.textContent = '';
+      if (mayorPhoto) { mayorPhoto.style.display = 'none'; mayorPhoto.src = ''; }
+      if (mayorName) mayorName.textContent = '';
+      if (officeParty) officeParty.textContent = '';
+      if (termStart) termStart.textContent = '';
+      if (termEnd) termEnd.textContent = '';
+      if (termProgress) termProgress.style.width = '0%';
+      if (votesEl) votesEl.textContent = '';
+      if (budgetEl) budgetEl.textContent = '';
+
+      try {
+        const res = await fetch(`/wp-json/politeia/v1/jurisdictions?name=${encodeURIComponent(name)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.found) {
+            if (headerName && data.common_name) headerName.textContent = data.common_name;
+            if (headerOfficial) headerOfficial.textContent = data.jurisdiction_name || '';
+            if (mayorPhoto) {
+              if (data.photo_url) {
+                mayorPhoto.src = data.photo_url;
+                mayorPhoto.style.display = 'block';
+              } else {
+                mayorPhoto.style.display = 'none';
+              }
             }
-          } else {
-            content.innerHTML = '<div>Error al cargar datos.</div>';
+            if (mayorName) mayorName.textContent = data.person_name || '';
+            if (officeParty) {
+              const parts = [];
+              if (data.office_title) parts.push(data.office_title);
+              if (data.party_short_name) parts.push(data.party_short_name);
+              officeParty.textContent = parts.join(', ');
+            }
+            if (termStart) termStart.textContent = data.started_on || '';
+            if (termEnd) termEnd.textContent = data.planned_end_on || '';
+            if (termProgress && data.started_on && data.planned_end_on) {
+              const start = new Date(data.started_on);
+              const end = new Date(data.planned_end_on);
+              const now = new Date();
+              const ratio = Math.min(Math.max((now - start) / (end - start), 0), 1);
+              termProgress.style.width = (ratio * 100) + '%';
+            }
+            if (votesEl && data.votes !== null && data.votes !== undefined) {
+              votesEl.textContent = `${Number(data.votes).toLocaleString('es-CL')} votos`;
+            }
+            if (budgetEl && data.budget !== null && data.budget !== undefined) {
+              budgetEl.textContent = `Presupuesto Anual Municipal: $${Number(data.budget).toLocaleString('es-CL')}`;
+            }
+          } else if (mayorName) {
+            mayorName.textContent = 'No hay datos disponibles.';
           }
-        } catch (e) {
-          content.innerHTML = '<div>Error al cargar datos.</div>';
+        } else if (mayorName) {
+          mayorName.textContent = 'Error al cargar datos.';
         }
+      } catch (e) {
+        if (mayorName) mayorName.textContent = 'Error al cargar datos.';
       }
+
       box.style.display = 'block';
     }
 
