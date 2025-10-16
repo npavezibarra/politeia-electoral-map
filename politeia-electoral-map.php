@@ -81,7 +81,16 @@ if ( file_exists( $assets_file ) ) {
  */
 $rest_juris_file = PLEM_DIR . 'includes/Modules/REST/class-jurisdictions.php';
 if ( file_exists( $rest_juris_file ) ) {
-	require_once $rest_juris_file;
+        require_once $rest_juris_file;
+}
+
+/**
+ * Migrations loader (ensures db schema additions run).
+ * Ruta: includes/class-politeia-migrations.php
+ */
+$migrations_loader = PLEM_DIR . 'includes/class-politeia-migrations.php';
+if ( file_exists( $migrations_loader ) ) {
+        require_once $migrations_loader;
 }
 
 // ======================================================
