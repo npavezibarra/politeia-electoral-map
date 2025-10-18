@@ -63,7 +63,16 @@ if ( file_exists( $settings_file ) ) {
  */
 $shortcode_file = PLEM_DIR . 'includes/Shortcodes/RMMap.php';
 if ( file_exists( $shortcode_file ) ) {
-	require_once $shortcode_file;
+        require_once $shortcode_file;
+}
+
+/**
+ * Shortcode del resumen de elecciones.
+ * Ruta: includes/shortcodes/election-summary.php
+ */
+$summary_shortcode = PLEM_DIR . 'includes/shortcodes/election-summary.php';
+if ( file_exists( $summary_shortcode ) ) {
+        require_once $summary_shortcode;
 }
 
 /**
