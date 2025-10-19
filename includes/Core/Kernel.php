@@ -3,7 +3,7 @@
 namespace Politeia\Core;
 
 class Kernel {
-    public const PLEM_VERSION = '0.2.7';
+    public const PLEM_VERSION = '0.2.8';
 
     /** @var object[] */
     private array $modules = [];

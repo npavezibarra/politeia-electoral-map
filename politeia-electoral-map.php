@@ -3,7 +3,7 @@
  * Plugin Name:       Politeia Electoral Map
  * Plugin URI:        https://github.com/npavezibarra/politeia-electoral-map
  * Description:       Visualizador electoral de Chile (mapas + datos). Paso 1: mapa en iframe con búsqueda de comunas RM.
- * Version:           0.2.7
+ * Version:           0.2.8
  * Author:            Politeia
  * Author URI:        https://politeia.cl
  * License:           GPL-2.0-or-later
@@ -31,10 +31,10 @@ if ( ! defined( 'PLEM_URL' ) ) {
 	define( 'PLEM_URL', plugin_dir_url( __FILE__ ) );
 }
 if ( ! defined( 'PLEM_VERSION' ) ) {
-        define( 'PLEM_VERSION', '0.2.7' );
+        define( 'PLEM_VERSION', '0.2.8' );
 }
 if ( ! defined( 'PLEM_DB_VERSION' ) ) {
-        define( 'PLEM_DB_VERSION', '0.2.7' );
+        define( 'PLEM_DB_VERSION', '0.2.8' );
 }
 
 // ======================================================

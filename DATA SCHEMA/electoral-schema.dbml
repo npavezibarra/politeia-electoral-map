@@ -48,3 +48,24 @@ Table wp_politeia_election_results {
     idx_results_party (party_id)
   }
 }
+
+Table wp_politeia_party_leanings {
+  id           bigint [pk, increment]
+  person_id    bigint [not null, ref: > wp_politeia_people.id]
+  party_id     bigint [not null, ref: > wp_politeia_political_parties.id]
+  election_id  bigint [ref: > wp_politeia_elections.id]
+  started_on   date
+  ended_on     date
+  type         varchar(40)
+  notes        varchar(255)
+  source       varchar(255)
+  source_url   varchar(400)
+  created_at   datetime
+  updated_at   datetime
+
+  indexes {
+    idx_leanings_person (person_id)
+    idx_leanings_party (party_id)
+    idx_leanings_election (election_id)
+  }
+}

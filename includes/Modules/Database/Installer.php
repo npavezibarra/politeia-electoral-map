@@ -47,6 +47,7 @@ class Installer {
                 $offices                  = "{$wpdb->prefix}politeia_offices";
                 $office_terms             = "{$wpdb->prefix}politeia_office_terms";
                 $party_memberships        = "{$wpdb->prefix}politeia_party_memberships";
+                $party_leanings           = "{$wpdb->prefix}politeia_party_leanings";
                 $jurisdiction_populations = "{$wpdb->prefix}politeia_jurisdiction_populations";
                 $jurisdiction_budgets     = "{$wpdb->prefix}politeia_jurisdiction_budgets";
                 $events                   = "{$wpdb->prefix}politeia_events";
@@ -132,7 +133,7 @@ class Installer {
   KEY idx_term_current (ended_on)
 ) ENGINE=InnoDB $collate;",
 
-			"CREATE TABLE $party_memberships (
+                        "CREATE TABLE $party_memberships (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   person_id BIGINT UNSIGNED NOT NULL,
   party_id  BIGINT UNSIGNED NOT NULL,
@@ -144,6 +145,28 @@ class Installer {
   PRIMARY KEY (id),
   KEY idx_membership_person (person_id, started_on),
   KEY idx_membership_party (party_id, started_on)
+) ENGINE=InnoDB $collate;",
+
+                        "CREATE TABLE $party_leanings (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  person_id BIGINT UNSIGNED NOT NULL,
+  party_id BIGINT UNSIGNED NOT NULL,
+  election_id BIGINT UNSIGNED NULL,
+  started_on DATE NULL,
+  ended_on DATE NULL,
+  type VARCHAR(40) NULL,
+  notes VARCHAR(255) NULL,
+  source VARCHAR(255) NULL,
+  source_url VARCHAR(400) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_leanings_person (person_id),
+  KEY idx_leanings_party (party_id),
+  KEY idx_leanings_election (election_id),
+  CONSTRAINT fk_leanings_person FOREIGN KEY (person_id) REFERENCES $people (id) ON DELETE CASCADE,
+  CONSTRAINT fk_leanings_party FOREIGN KEY (party_id) REFERENCES $parties (id) ON DELETE CASCADE,
+  CONSTRAINT fk_leanings_election FOREIGN KEY (election_id) REFERENCES $elections (id) ON DELETE SET NULL
 ) ENGINE=InnoDB $collate;",
 
 			"CREATE TABLE $jurisdiction_populations (
