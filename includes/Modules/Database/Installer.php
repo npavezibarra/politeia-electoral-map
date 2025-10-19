@@ -42,13 +42,14 @@ class Installer {
 	public static function get_schema_sql( wpdb $wpdb ): array {
 		$collate                  = $wpdb->get_charset_collate();
 		$people                   = "{$wpdb->prefix}politeia_people";
-		$parties                  = "{$wpdb->prefix}politeia_political_parties";
-		$jurisdictions            = "{$wpdb->prefix}politeia_jurisdictions";
-		$offices                  = "{$wpdb->prefix}politeia_offices";
-		$office_terms             = "{$wpdb->prefix}politeia_office_terms";
-		$party_memberships        = "{$wpdb->prefix}politeia_party_memberships";
-		$jurisdiction_populations = "{$wpdb->prefix}politeia_jurisdiction_populations";
+                $parties                  = "{$wpdb->prefix}politeia_political_parties";
+                $jurisdictions            = "{$wpdb->prefix}politeia_jurisdictions";
+                $offices                  = "{$wpdb->prefix}politeia_offices";
+                $office_terms             = "{$wpdb->prefix}politeia_office_terms";
+                $party_memberships        = "{$wpdb->prefix}politeia_party_memberships";
+                $jurisdiction_populations = "{$wpdb->prefix}politeia_jurisdiction_populations";
                 $jurisdiction_budgets     = "{$wpdb->prefix}politeia_jurisdiction_budgets";
+                $events                   = "{$wpdb->prefix}politeia_events";
                 $elections                = "{$wpdb->prefix}politeia_elections";
                 $election_results         = "{$wpdb->prefix}politeia_election_results";
                 $candidacies              = "{$wpdb->prefix}politeia_candidacies";
@@ -173,43 +174,57 @@ class Installer {
   KEY idx_budget_jur (jurisdiction_id)
 ) ENGINE=InnoDB $collate;",
 
+                        "CREATE TABLE $events (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  name VARCHAR(200) NULL,
+  description TEXT NULL,
+  date_start DATE NULL,
+  date_end DATE NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY  (id)
+) ENGINE=InnoDB $collate;",
+
                         "CREATE TABLE $elections (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   event_id BIGINT UNSIGNED NULL,
   office_id BIGINT UNSIGNED NOT NULL,
-  jurisdiction_id BIGINT UNSIGNED NULL,
   election_date DATE NOT NULL,
-  title VARCHAR(255) NULL,
   name VARCHAR(255) NULL,
   round_number INT NOT NULL DEFAULT 1,
   seats INT NULL,
   rounds INT NULL,
-  voting_system VARCHAR(100) NULL,
+  voting_system VARCHAR(50) NULL,
   electoral_system VARCHAR(100) NULL,
-  source_url VARCHAR(400) NULL,
+  source_url VARCHAR(500) NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  UNIQUE KEY uq_elec_office_scope_date (office_id, jurisdiction_id, election_date)
+  KEY idx_elections_event (event_id),
+  UNIQUE KEY uq_elec_office_date_round (office_id, election_date, round_number),
+  CONSTRAINT fk_elections_event FOREIGN KEY (event_id) REFERENCES $events (id) ON DELETE SET NULL
 ) ENGINE=InnoDB $collate;",
 
                         "CREATE TABLE $election_results (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   election_id BIGINT UNSIGNED NOT NULL,
   jurisdiction_id BIGINT UNSIGNED NOT NULL,
-  total_registered INT NULL,
-  total_votes INT NULL,
-  valid_votes INT NULL,
-  blank_votes INT NULL,
-  null_votes INT NULL,
-  participation_rate DECIMAL(6,3) NULL,
+  candidate_id BIGINT UNSIGNED NULL,
+  party_id BIGINT UNSIGNED NULL,
+  votes INT NOT NULL DEFAULT 0,
+  percentage DECIMAL(5,2) NULL,
+  elected TINYINT(1) NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  UNIQUE KEY uq_results_per_jurisdiction (election_id, jurisdiction_id),
-  KEY idx_results_election_id (election_id),
-  CONSTRAINT fk_results_election FOREIGN KEY (election_id) REFERENCES $elections (id) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT fk_results_jurisdiction FOREIGN KEY (jurisdiction_id) REFERENCES $jurisdictions (id) ON DELETE RESTRICT ON UPDATE CASCADE
+  KEY idx_results_election (election_id),
+  KEY idx_results_jurisdiction (jurisdiction_id),
+  KEY idx_results_candidate (candidate_id),
+  KEY idx_results_party (party_id),
+  CONSTRAINT fk_results_election FOREIGN KEY (election_id) REFERENCES $elections (id) ON DELETE CASCADE,
+  CONSTRAINT fk_results_jurisdiction FOREIGN KEY (jurisdiction_id) REFERENCES $jurisdictions (id) ON DELETE CASCADE,
+  CONSTRAINT fk_results_candidate FOREIGN KEY (candidate_id) REFERENCES $people (id) ON DELETE SET NULL,
+  CONSTRAINT fk_results_party FOREIGN KEY (party_id) REFERENCES $parties (id) ON DELETE SET NULL
 ) ENGINE=InnoDB $collate;",
 
 			"CREATE TABLE $candidacies (
