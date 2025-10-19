@@ -87,14 +87,16 @@ class Installer {
   common_name VARCHAR(200) NULL,
   type VARCHAR(24) NOT NULL,            -- e.g., COUNTRY, REGION, PROVINCE, COMMUNE, etc.
   parent_id BIGINT UNSIGNED NULL,       -- self hierarchy
-  external_code VARCHAR(40) NULL,       -- INE/SERVEL
+  external_code VARCHAR(10) NULL,       -- INE/SERVEL
   founded_on DATE NULL,
   dissolved_on DATE NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  KEY idx_juris_parent (parent_id),
-  KEY idx_juris_type_name (type, official_name)
+  UNIQUE KEY uq_politeia_jurisdictions_external (external_code),
+  KEY idx_politeia_jurisdictions_type (type),
+  KEY idx_politeia_jurisdictions_parent (parent_id),
+  KEY idx_politeia_jurisdictions_common_name (common_name)
 ) ENGINE=InnoDB $collate;",
 
 			"CREATE TABLE $offices (
