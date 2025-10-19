@@ -48,9 +48,10 @@ class Installer {
 		$office_terms             = "{$wpdb->prefix}politeia_office_terms";
 		$party_memberships        = "{$wpdb->prefix}politeia_party_memberships";
 		$jurisdiction_populations = "{$wpdb->prefix}politeia_jurisdiction_populations";
-		$jurisdiction_budgets     = "{$wpdb->prefix}politeia_jurisdiction_budgets";
-		$elections                = "{$wpdb->prefix}politeia_elections";
-		$candidacies              = "{$wpdb->prefix}politeia_candidacies";
+                $jurisdiction_budgets     = "{$wpdb->prefix}politeia_jurisdiction_budgets";
+                $elections                = "{$wpdb->prefix}politeia_elections";
+                $election_results         = "{$wpdb->prefix}politeia_election_results";
+                $candidacies              = "{$wpdb->prefix}politeia_candidacies";
 
 		return array(
 			"CREATE TABLE $people (
@@ -176,22 +177,39 @@ class Installer {
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   event_id BIGINT UNSIGNED NULL,
   office_id BIGINT UNSIGNED NOT NULL,
-  jurisdiction_id BIGINT UNSIGNED NOT NULL,
+  jurisdiction_id BIGINT UNSIGNED NULL,
   election_date DATE NOT NULL,
-  name VARCHAR(200) NULL,
+  title VARCHAR(255) NULL,
+  name VARCHAR(255) NULL,
   round_number INT NOT NULL DEFAULT 1,
-  seats INT NOT NULL DEFAULT 1,
-  system VARCHAR(40) NULL,              -- e.g., 'majoritarian', 'dHondt'
+  seats INT NULL,
+  rounds INT NULL,
+  voting_system VARCHAR(100) NULL,
+  electoral_system VARCHAR(100) NULL,
+  source_url VARCHAR(400) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_elec_office_scope_date (office_id, jurisdiction_id, election_date)
+) ENGINE=InnoDB $collate;",
+
+                        "CREATE TABLE $election_results (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  election_id BIGINT UNSIGNED NOT NULL,
+  jurisdiction_id BIGINT UNSIGNED NOT NULL,
   total_registered INT NULL,
   total_votes INT NULL,
   valid_votes INT NULL,
   blank_votes INT NULL,
   null_votes INT NULL,
-  source_url VARCHAR(400) NULL,
+  participation_rate DECIMAL(6,3) NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  KEY idx_elec_jur_office_date (jurisdiction_id, office_id, election_date)
+  UNIQUE KEY uq_results_per_jurisdiction (election_id, jurisdiction_id),
+  KEY idx_results_election_id (election_id),
+  CONSTRAINT fk_results_election FOREIGN KEY (election_id) REFERENCES $elections (id) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT fk_results_jurisdiction FOREIGN KEY (jurisdiction_id) REFERENCES $jurisdictions (id) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB $collate;",
 
 			"CREATE TABLE $candidacies (

@@ -1,0 +1,39 @@
+Table wp_politeia_elections {
+  id               bigint [pk, increment]
+  event_id         bigint
+  office_id        bigint [not null]
+  jurisdiction_id  bigint
+  election_date    date [not null]
+  title            varchar(255)
+  name             varchar(255)
+  round_number     int [default: 1]
+  seats            int
+  rounds           int
+  voting_system    varchar(100)
+  electoral_system varchar(100)
+  source_url       varchar(400)
+  created_at       datetime
+  updated_at       datetime
+
+  indexes {
+    (office_id, jurisdiction_id, election_date) [unique]
+  }
+}
+
+Table wp_politeia_election_results {
+  id                 bigint [pk, increment]
+  election_id        bigint [not null, ref: > wp_politeia_elections.id]
+  jurisdiction_id    bigint [not null, ref: > wp_politeia_jurisdictions.id]
+  total_registered   int
+  total_votes        int
+  valid_votes        int
+  blank_votes        int
+  null_votes         int
+  participation_rate decimal(6,3)
+  created_at         datetime
+  updated_at         datetime
+
+  indexes {
+    (election_id, jurisdiction_id) [unique]
+  }
+}

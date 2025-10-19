@@ -12,8 +12,9 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 global $wpdb;
 
 $tables = array(
-	"{$wpdb->prefix}politeia_candidacies",
-	"{$wpdb->prefix}politeia_elections",
+        "{$wpdb->prefix}politeia_candidacies",
+        "{$wpdb->prefix}politeia_election_results",
+        "{$wpdb->prefix}politeia_elections",
 	"{$wpdb->prefix}politeia_jurisdiction_budgets",
 	"{$wpdb->prefix}politeia_jurisdiction_populations",
 	"{$wpdb->prefix}politeia_office_terms",
