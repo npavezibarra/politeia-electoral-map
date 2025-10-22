@@ -42,15 +42,18 @@ class Installer {
 	public static function get_schema_sql( wpdb $wpdb ): array {
 		$collate                  = $wpdb->get_charset_collate();
 		$people                   = "{$wpdb->prefix}politeia_people";
-		$parties                  = "{$wpdb->prefix}politeia_political_parties";
-		$jurisdictions            = "{$wpdb->prefix}politeia_jurisdictions";
-		$offices                  = "{$wpdb->prefix}politeia_offices";
-		$office_terms             = "{$wpdb->prefix}politeia_office_terms";
-		$party_memberships        = "{$wpdb->prefix}politeia_party_memberships";
-		$jurisdiction_populations = "{$wpdb->prefix}politeia_jurisdiction_populations";
-		$jurisdiction_budgets     = "{$wpdb->prefix}politeia_jurisdiction_budgets";
-		$elections                = "{$wpdb->prefix}politeia_elections";
-		$candidacies              = "{$wpdb->prefix}politeia_candidacies";
+                $parties                  = "{$wpdb->prefix}politeia_political_parties";
+                $jurisdictions            = "{$wpdb->prefix}politeia_jurisdictions";
+                $offices                  = "{$wpdb->prefix}politeia_offices";
+                $office_terms             = "{$wpdb->prefix}politeia_office_terms";
+                $party_memberships        = "{$wpdb->prefix}politeia_party_memberships";
+                $party_leanings           = "{$wpdb->prefix}politeia_party_leanings";
+                $jurisdiction_populations = "{$wpdb->prefix}politeia_jurisdiction_populations";
+                $jurisdiction_budgets     = "{$wpdb->prefix}politeia_jurisdiction_budgets";
+                $events                   = "{$wpdb->prefix}politeia_events";
+                $elections                = "{$wpdb->prefix}politeia_elections";
+                $election_results         = "{$wpdb->prefix}politeia_election_results";
+                $candidacies              = "{$wpdb->prefix}politeia_candidacies";
 
 		return array(
 			"CREATE TABLE $people (
@@ -87,14 +90,16 @@ class Installer {
   common_name VARCHAR(200) NULL,
   type VARCHAR(24) NOT NULL,            -- e.g., COUNTRY, REGION, PROVINCE, COMMUNE, etc.
   parent_id BIGINT UNSIGNED NULL,       -- self hierarchy
-  external_code VARCHAR(40) NULL,       -- INE/SERVEL
+  external_code VARCHAR(10) NULL,       -- INE/SERVEL
   founded_on DATE NULL,
   dissolved_on DATE NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  KEY idx_juris_parent (parent_id),
-  KEY idx_juris_type_name (type, official_name)
+  UNIQUE KEY uq_politeia_jurisdictions_external (external_code),
+  KEY idx_politeia_jurisdictions_type (type),
+  KEY idx_politeia_jurisdictions_parent (parent_id),
+  KEY idx_politeia_jurisdictions_common_name (common_name)
 ) ENGINE=InnoDB $collate;",
 
 			"CREATE TABLE $offices (
@@ -128,7 +133,7 @@ class Installer {
   KEY idx_term_current (ended_on)
 ) ENGINE=InnoDB $collate;",
 
-			"CREATE TABLE $party_memberships (
+                        "CREATE TABLE $party_memberships (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   person_id BIGINT UNSIGNED NOT NULL,
   party_id  BIGINT UNSIGNED NOT NULL,
@@ -140,6 +145,28 @@ class Installer {
   PRIMARY KEY (id),
   KEY idx_membership_person (person_id, started_on),
   KEY idx_membership_party (party_id, started_on)
+) ENGINE=InnoDB $collate;",
+
+                        "CREATE TABLE $party_leanings (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  person_id BIGINT UNSIGNED NOT NULL,
+  party_id BIGINT UNSIGNED NOT NULL,
+  election_id BIGINT UNSIGNED NULL,
+  started_on DATE NULL,
+  ended_on DATE NULL,
+  type VARCHAR(40) NULL,
+  notes VARCHAR(255) NULL,
+  source VARCHAR(255) NULL,
+  source_url VARCHAR(400) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_leanings_person (person_id),
+  KEY idx_leanings_party (party_id),
+  KEY idx_leanings_election (election_id),
+  CONSTRAINT fk_leanings_person FOREIGN KEY (person_id) REFERENCES $people (id) ON DELETE CASCADE,
+  CONSTRAINT fk_leanings_party FOREIGN KEY (party_id) REFERENCES $parties (id) ON DELETE CASCADE,
+  CONSTRAINT fk_leanings_election FOREIGN KEY (election_id) REFERENCES $elections (id) ON DELETE SET NULL
 ) ENGINE=InnoDB $collate;",
 
 			"CREATE TABLE $jurisdiction_populations (
@@ -170,26 +197,57 @@ class Installer {
   KEY idx_budget_jur (jurisdiction_id)
 ) ENGINE=InnoDB $collate;",
 
+                        "CREATE TABLE $events (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  name VARCHAR(200) NULL,
+  description TEXT NULL,
+  date_start DATE NULL,
+  date_end DATE NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY  (id)
+) ENGINE=InnoDB $collate;",
+
                         "CREATE TABLE $elections (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   event_id BIGINT UNSIGNED NULL,
   office_id BIGINT UNSIGNED NOT NULL,
-  jurisdiction_id BIGINT UNSIGNED NOT NULL,
   election_date DATE NOT NULL,
-  name VARCHAR(200) NULL,
+  name VARCHAR(255) NULL,
   round_number INT NOT NULL DEFAULT 1,
-  seats INT NOT NULL DEFAULT 1,
-  system VARCHAR(40) NULL,              -- e.g., 'majoritarian', 'dHondt'
-  total_registered INT NULL,
-  total_votes INT NULL,
-  valid_votes INT NULL,
-  blank_votes INT NULL,
-  null_votes INT NULL,
-  source_url VARCHAR(400) NULL,
+  seats INT NULL,
+  rounds INT NULL,
+  voting_system VARCHAR(50) NULL,
+  electoral_system VARCHAR(100) NULL,
+  source_url VARCHAR(500) NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  KEY idx_elec_jur_office_date (jurisdiction_id, office_id, election_date)
+  KEY idx_elections_event (event_id),
+  UNIQUE KEY uq_elec_office_date_round (office_id, election_date, round_number),
+  CONSTRAINT fk_elections_event FOREIGN KEY (event_id) REFERENCES $events (id) ON DELETE SET NULL
+) ENGINE=InnoDB $collate;",
+
+                        "CREATE TABLE $election_results (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  election_id BIGINT UNSIGNED NOT NULL,
+  jurisdiction_id BIGINT UNSIGNED NOT NULL,
+  candidate_id BIGINT UNSIGNED NULL,
+  party_id BIGINT UNSIGNED NULL,
+  votes INT NOT NULL DEFAULT 0,
+  percentage DECIMAL(5,2) NULL,
+  elected TINYINT(1) NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_results_election (election_id),
+  KEY idx_results_jurisdiction (jurisdiction_id),
+  KEY idx_results_candidate (candidate_id),
+  KEY idx_results_party (party_id),
+  CONSTRAINT fk_results_election FOREIGN KEY (election_id) REFERENCES $elections (id) ON DELETE CASCADE,
+  CONSTRAINT fk_results_jurisdiction FOREIGN KEY (jurisdiction_id) REFERENCES $jurisdictions (id) ON DELETE CASCADE,
+  CONSTRAINT fk_results_candidate FOREIGN KEY (candidate_id) REFERENCES $people (id) ON DELETE SET NULL,
+  CONSTRAINT fk_results_party FOREIGN KEY (party_id) REFERENCES $parties (id) ON DELETE SET NULL
 ) ENGINE=InnoDB $collate;",
 
 			"CREATE TABLE $candidacies (

@@ -10,3 +10,4 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 require_once __DIR__ . '/migrations/2025-10-15-add-turnout-table.php';
+require_once __DIR__ . '/migrations/2025_10_19_add_wp_politeia_party_leanings.php';

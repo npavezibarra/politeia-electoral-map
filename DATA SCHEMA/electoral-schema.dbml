@@ -1,0 +1,71 @@
+Table wp_politeia_events {
+  id          bigint [pk, increment]
+  name        varchar(200)
+  description text
+  date_start  date
+  date_end    date
+  created_at  datetime
+  updated_at  datetime
+}
+
+Table wp_politeia_elections {
+  id               bigint [pk, increment]
+  event_id         bigint [ref: > wp_politeia_events.id]
+  office_id        bigint [not null]
+  election_date    date [not null]
+  name             varchar(255)
+  round_number     int [default: 1]
+  seats            int
+  rounds           int
+  voting_system    varchar(50)
+  electoral_system varchar(100)
+  source_url       varchar(500)
+  created_at       datetime
+  updated_at       datetime
+
+  indexes {
+    idx_elections_event (event_id)
+    (office_id, election_date, round_number) [unique]
+  }
+}
+
+Table wp_politeia_election_results {
+  id               bigint [pk, increment]
+  election_id      bigint [not null, ref: > wp_politeia_elections.id]
+  jurisdiction_id  bigint [not null, ref: > wp_politeia_jurisdictions.id]
+  candidate_id     bigint [ref: > wp_politeia_people.id]
+  party_id         bigint [ref: > wp_politeia_political_parties.id]
+  votes            int [default: 0]
+  percentage       decimal(5,2)
+  elected          bool [default: false]
+  created_at       datetime
+  updated_at       datetime
+
+  indexes {
+    idx_results_election (election_id)
+    idx_results_jurisdiction (jurisdiction_id)
+    idx_results_candidate (candidate_id)
+    idx_results_party (party_id)
+  }
+}
+
+Table wp_politeia_party_leanings {
+  id           bigint [pk, increment]
+  person_id    bigint [not null, ref: > wp_politeia_people.id]
+  party_id     bigint [not null, ref: > wp_politeia_political_parties.id]
+  election_id  bigint [ref: > wp_politeia_elections.id]
+  started_on   date
+  ended_on     date
+  type         varchar(40)
+  notes        varchar(255)
+  source       varchar(255)
+  source_url   varchar(400)
+  created_at   datetime
+  updated_at   datetime
+
+  indexes {
+    idx_leanings_person (person_id)
+    idx_leanings_party (party_id)
+    idx_leanings_election (election_id)
+  }
+}
