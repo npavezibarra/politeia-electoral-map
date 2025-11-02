@@ -358,6 +358,13 @@
       document.addEventListener('click', e => { if (!e.target.closest('.toolbar')) box.classList.remove('visible'); });
     };
 
+    document.addEventListener('DOMContentLoaded', () => {
+      const redundantTitle = document.querySelector('.prs-session-modal__content .prs-book-title');
+      if (redundantTitle) {
+        redundantTitle.remove();
+      }
+    });
+
     if (API_KEY) {
       const s = document.createElement('script');
       s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(API_KEY)}&callback=initMap`;
