@@ -1,0 +1,8 @@
+/**
+ * REST base controller (must load before specific controllers).
+ * Ruta: includes/Modules/REST/Controller.php
+ */
+$rest_controller_file = PLEM_DIR . 'includes/Modules/REST/Controller.php';
+if ( file_exists( $rest_controller_file ) ) {
+	require_once $rest_controller_file;
+}
