@@ -142,6 +142,24 @@
       margin-bottom: 20px;
     }
 
+    #info-mayor-details {
+      width: 218px;
+    }
+
+    #info-mayor-title {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #6b7280;
+      margin-bottom: 2px;
+    }
+
+    #info-mayor-party {
+      font-size: 13px;
+      color: #6b7280;
+      margin-top: 2px;
+    }
+
     #info-mayor-photo {
       width: 80px;
       /* Fixed width */
@@ -223,13 +241,15 @@
       <div id="INFOCARD-HEADER">
         <div id="info-header-type">Comuna</div>
         <div id="info-header-name"></div>
+        <div id="info-header-region"></div>
       </div>
       <div id="INFOCARD-COMMUNE">
         <div id="info-mayor">
           <div id="info-mayor-photo"></div>
           <div id="info-mayor-details">
+            <div id="info-mayor-title"></div>
             <div id="info-mayor-name"></div>
-            <div id="info-office-party"></div>
+            <div id="info-mayor-party"></div>
           </div>
         </div>
         <div id="info-term">
@@ -368,22 +388,25 @@
         headerType.textContent = (type === 'Region') ? 'Región' : type;
       }
 
-      // ... (Rest of existing showInfo logic remains mostly same)
       const headerName = document.getElementById('info-header-name');
+      const headerRegion = document.getElementById('info-header-region');
+      const mayorTitle = document.getElementById('info-mayor-title');
       const mayorName = document.getElementById('info-mayor-name');
-      const officeParty = document.getElementById('info-office-party');
+      const mayorParty = document.getElementById('info-mayor-party');
       const termStart = document.getElementById('info-term-start');
       const termEnd = document.getElementById('info-term-end');
       const termProgress = document.getElementById('info-term-progress');
       const votesEl = document.getElementById('info-votes');
       const populationEl = document.getElementById('info-population');
       const budgetEl = document.getElementById('info-budget');
-      const concejalesList = document.getElementById('info-concejales-list'); // Ensure this ID exists in HTML or handle missing
+      const concejalesList = document.getElementById('info-concejales-list');
 
       // Clear previous
       if (headerName) headerName.textContent = name;
+      if (headerRegion) headerRegion.textContent = '';
+      if (mayorTitle) mayorTitle.textContent = '';
       if (mayorName) mayorName.textContent = 'Cargando...';
-      if (officeParty) officeParty.textContent = '';
+      if (mayorParty) mayorParty.textContent = '';
       if (termStart) termStart.textContent = '';
       if (termEnd) termEnd.textContent = '';
       if (termProgress) termProgress.style.width = '0%';
@@ -400,13 +423,12 @@
           const data = await res.json();
           if (data.found) {
             if (headerName && data.common_name) headerName.textContent = toTitleCase(data.common_name);
+            if (headerRegion && data.parent_region_name) headerRegion.textContent = toTitleCase(data.parent_region_name);
+
+            if (mayorTitle && data.office_title) mayorTitle.textContent = data.office_title;
             if (mayorName) mayorName.textContent = toTitleCase(data.person_name) || '';
-            if (officeParty) {
-              const parts = [];
-              if (data.office_title) parts.push(data.office_title);
-              if (data.party_short_name) parts.push(data.party_short_name);
-              officeParty.textContent = parts.join(', ');
-            }
+            if (mayorParty && data.party_short_name) mayorParty.textContent = data.party_short_name;
+
             if (termStart) termStart.textContent = data.started_on || '';
             if (termEnd) termEnd.textContent = data.planned_end_on || '';
             if (termProgress && data.started_on && data.planned_end_on) {
@@ -534,7 +556,7 @@
 
         // 3. Zoom/Pan
         fitFeatureWithOffset(feature, {
-          xRatio: 2 / 3, yRatio: 0.5, onDone: () => {
+          onDone: () => {
             // 4. Show Info
             showInfo(item.label, item.type);
           }
@@ -548,18 +570,51 @@
     }
 
     // --- Fit & Pan Helper ---
-    function fitFeatureWithOffset(feature, { padding, xRatio, yRatio, onDone } = {}) {
+    function fitFeatureWithOffset(feature, { onDone } = {}) {
       const bounds = new google.maps.LatLngBounds();
       feature.getGeometry().forEachLatLng(p => bounds.extend(p));
-      map.fitBounds(bounds, padding || { top: 50, right: 50, bottom: 50, left: 50 });
 
-      google.maps.event.addListenerOnce(map, 'idle', () => {
-        const div = map.getDiv();
-        const panX = (0.5 - (xRatio || 0.5)) * div.clientWidth;
-        const panY = (0.5 - (yRatio || 0.5)) * div.clientHeight;
-        map.panBy(panX, panY);
-        if (onDone) google.maps.event.addListenerOnce(map, 'idle', onDone);
+      // 1. Calculate bounding box dimensions (Height/Width ratio)
+      const ne = bounds.getNorthEast();
+      const sw = bounds.getSouthWest();
+      const height = ne.lat() - sw.lat(); // Degrees latitude
+      const width = ne.lng() - sw.lng(); // Degrees longitude
+
+      // Simple heuristic: compare degrees directly (approximate but sufficient for this purpose)
+      // or use aspect ratio of the bounding box vs viewport aspect ratio.
+      // But user requested specific logic: "Is this shape wider or tall"
+      const isPortrait = height > width;
+
+      // 2. Define Available Viewport
+      const cardWidth = 350;
+      const margin = 80;
+      const mapDiv = map.getDiv();
+      const fullWidth = mapDiv.clientWidth;
+      const fullHeight = mapDiv.clientHeight;
+
+      // Available space for the map shape
+      const safeWidth = fullWidth - cardWidth - (margin * 2);
+      const safeHeight = fullHeight - (margin * 2);
+
+      // 3. Fit Bounds with Padding
+      // fitBounds() takes padding in pixels. We want to pad the LEFT side by (cardWidth + margin)
+      // and others by margin.
+      // This automatically handles the "centering" in the available space.
+      map.fitBounds(bounds, {
+        top: margin,
+        right: margin,
+        bottom: margin,
+        left: cardWidth + margin
       });
+
+      // Note: fitBounds with specific padding effectively places the bounds in the "safe zone"
+      // defined by that padding. No manual panBy is needed if padding is correct!
+      // However, if we want to ensure specific "largest dimension" fit logic:
+      // Google Maps fitBounds does "contain" logic automatically.
+      // If we provide the padding: left: 430px (350+80), right: 80px, top: 80px, bottom: 80px
+      // It will fit the shape into the remaining rectangle (safeWidth x safeHeight).
+
+      if (onDone) google.maps.event.addListenerOnce(map, 'idle', onDone);
     }
 
     // --- Init ---
@@ -588,7 +643,7 @@
         // We can check currentRegionFile to guess type if needed.
 
         highlight(e.feature);
-        fitFeatureWithOffset(e.feature, { xRatio: 2 / 3, yRatio: 0.5, onDone: () => showInfo(name) });
+        fitFeatureWithOffset(e.feature, { onDone: () => showInfo(name) });
         document.getElementById('q').value = name;
       });
 

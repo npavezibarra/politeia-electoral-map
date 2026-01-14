@@ -60,7 +60,7 @@ class Jurisdictions extends Controller
 		// 1. Resolve Jurisdiction ID with robust matching
 		// Try exact match first
 		$jur_row = $wpdb->get_row($wpdb->prepare(
-			"SELECT id, official_name, common_name FROM $jurisdictions WHERE official_name = %s OR common_name = %s",
+			"SELECT id, official_name, common_name, parent_id FROM $jurisdictions WHERE official_name = %s OR common_name = %s",
 			$name,
 			$name
 		));
@@ -72,7 +72,7 @@ class Jurisdictions extends Controller
 
 			// 2. Try exact match with cleaned name (e.g. "de Atacama" -> "DE ATACAMA")
 			$jur_row = $wpdb->get_row($wpdb->prepare(
-				"SELECT id, official_name, common_name FROM $jurisdictions WHERE official_name = %s OR common_name = %s",
+				"SELECT id, official_name, common_name, parent_id FROM $jurisdictions WHERE official_name = %s OR common_name = %s",
 				$clean_name,
 				$clean_name
 			));
@@ -83,7 +83,7 @@ class Jurisdictions extends Controller
 			// We search for official_name containing the clean name.
 			$like_query = '%' . $wpdb->esc_like($clean_name) . '%';
 			$jur_row = $wpdb->get_row($wpdb->prepare(
-				"SELECT id, official_name, common_name FROM $jurisdictions WHERE official_name LIKE %s OR common_name LIKE %s LIMIT 1",
+				"SELECT id, official_name, common_name, parent_id FROM $jurisdictions WHERE official_name LIKE %s OR common_name LIKE %s LIMIT 1",
 				$like_query,
 				$like_query
 			));
@@ -97,7 +97,7 @@ class Jurisdictions extends Controller
 			if ($cleaner_name !== $clean_name) {
 				$like_query_2 = '%' . $wpdb->esc_like($cleaner_name) . '%';
 				$jur_row = $wpdb->get_row($wpdb->prepare(
-					"SELECT id, official_name, common_name FROM $jurisdictions WHERE official_name LIKE %s OR common_name LIKE %s LIMIT 1",
+					"SELECT id, official_name, common_name, parent_id FROM $jurisdictions WHERE official_name LIKE %s OR common_name LIKE %s LIMIT 1",
 					$like_query_2,
 					$like_query_2
 				));
@@ -136,6 +136,15 @@ class Jurisdictions extends Controller
 
 		$term_row = $wpdb->get_row($wpdb->prepare($term_query, $jurisdiction_id), ARRAY_A);
 
+		// Fetch Parent Region Name
+		$parent_region_name = null;
+		if ($jur_row->parent_id) {
+			$parent_region_name = $wpdb->get_var($wpdb->prepare(
+				"SELECT official_name FROM $jurisdictions WHERE id = %d",
+				$jur_row->parent_id
+			));
+		}
+
 		if ($term_row) {
 			// Found an active official (e.g. Governor)
 			return new \WP_REST_Response(
@@ -143,6 +152,7 @@ class Jurisdictions extends Controller
 					'found' => true,
 					'jurisdiction_name' => $jurisdiction_name,
 					'common_name' => $common_name,
+					'parent_region_name' => $parent_region_name,
 					'person_name' => trim($term_row['person_name']),
 					'photo_url' => null,
 					'office_title' => $term_row['office_title'],
@@ -187,6 +197,7 @@ class Jurisdictions extends Controller
 					'found' => true,
 					'jurisdiction_name' => $jurisdiction_name,
 					'common_name' => $common_name,
+					'parent_region_name' => $parent_region_name,
 					'person_name' => trim($cand_row['person_name']),
 					'photo_url' => null,
 					'office_title' => $cand_row['office_title'],
