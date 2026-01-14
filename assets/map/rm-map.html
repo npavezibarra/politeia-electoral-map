@@ -143,10 +143,15 @@
     }
 
     #info-mayor-photo {
-      width: 94px;
+      width: 80px;
+      /* Fixed width */
       height: 80px;
+      /* Fixed height */
       border-radius: 50%;
+      /* Perfect circle */
       background: #d1d5db;
+      flex-shrink: 0;
+      /* Prevent shrinking when text is long */
     }
 
     #info-term-bar {
@@ -206,7 +211,7 @@
 
     <div class="toolbar">
       <div class="search">
-        <input id="q" type="search" placeholder="Busca una comuna de la RM (ej: Las Condes, Maipú…)"
+        <input id="q" type="search" placeholder="Busca una comuna, provincia o región (ej: Arica, Valparaíso…)"
           autocomplete="off" />
       </div>
       <div id="suggestions" class="suggestions"></div>
@@ -256,7 +261,11 @@
     // --- Parámetros y rutas ---
     const params = new URLSearchParams(location.search);
     const API_KEY = params.get('api_key') || '';
-    const GEOJSON_URL = '../geojson/comunas_rm_oficial_wgs84.geojson';
+
+    // Default to RM if no hash or state
+    const DEFAULT_REGION_FILE = 'comunas_rm_oficial_wgs84.geojson';
+    const INDEX_URL = '../geojson/search_index.json';
+
     const { __, sprintf } = window.wp?.i18n || {
       __: s => s,
       sprintf: (s, ...a) => s.replace(/%s/g, () => a.shift())
@@ -264,40 +273,40 @@
 
     // --- Estado ---
     let map, highlighted = null;
-    const idxByName = new Map();
+    let masterIndex = []; // The global search index
+    let currentRegionFile = null;
+    let currentRegionData = new Map(); // Index of features in the current view
 
     // --- Utils ---
-    const norm = s => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    const norm = s => (s || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
 
-    // Convert "LAS CONDES" to "Las Condes", "CATALINA SAN MARTIN" to "Catalina San Martin"
     const toTitleCase = s => {
       if (!s) return s;
       return s.toLowerCase().split(' ').map(word => {
-        // Handle special cases like "de", "del", "la", "las", "los", "y"
-        if (['de', 'del', 'la', 'las', 'los', 'y', 'e'].includes(word)) {
-          return word;
-        }
+        if (['de', 'del', 'la', 'las', 'los', 'y', 'e'].includes(word)) return word;
         return word.charAt(0).toUpperCase() + word.slice(1);
       }).join(' ');
     };
 
-    function comunaName(feature) {
-      const keys = ['Comuna', 'COMUNA', 'NOM_COMUNA', 'name'];
-      for (const k of keys) { const v = feature.getProperty(k); if (v) return v; }
-      return 'Sin nombre';
-    }
+    function featureName(feature) {
+      // Try Comuna Name
+      let v = feature.getProperty('Comuna') || feature.getProperty('COMUNA') || feature.getProperty('NOM_COMUNA') || feature.getProperty('name');
+      if (v) return v;
+      // Try Provincia Name
+      v = feature.getProperty('Provincia') || feature.getProperty('PROVINCIA');
+      if (v) return v;
+      // Try Region Name (rare on map features generally, but possible)
+      v = feature.getProperty('Region');
+      if (v) return v;
 
-    function provinciaName(feature) {
-      const keys = ['Provincia', 'PROVINCIA'];
-      for (const k of keys) { const v = feature.getProperty(k); if (v) return v; }
-      return '';
+      return 'Sin nombre';
     }
 
     function styleFeature(feature) {
       const isH = !!feature.getProperty('isHighlighted');
       return {
         fillColor: isH ? '#3b82f6' : '#2563eb',
-        fillOpacity: isH ? 0.28 : 0.14,
+        fillOpacity: isH ? 0.28 : 0.04,
         strokeColor: isH ? '#1d4ed8' : '#1e40af',
         strokeWeight: isH ? 2.6 : 1.6
       };
@@ -310,8 +319,56 @@
       map.data.setStyle(styleFeature);
     }
 
-    async function showInfo(name) {
+    // --- Data Loading & Info ---
+
+    async function loadRegion(filename) {
+      if (currentRegionFile === filename) return; // Already loaded
+
+      document.getElementById('chip').textContent = 'Cargando región...';
+
+      // Clear Map Data
+      map.data.forEach(f => map.data.remove(f));
+      currentRegionData.clear();
+      highlighted = null;
+
+      // Load new GeoJSON
+      const url = `../geojson/${filename}`;
+
+      return new Promise((resolve) => {
+        map.data.loadGeoJson(url, null, (features) => {
+          currentRegionFile = filename;
+
+          // Build local index for mouse interactions
+          features.forEach(f => {
+            const name = featureName(f);
+            if (name) {
+              currentRegionData.set(norm(name), f);
+            }
+          });
+
+          // Zoom to extent
+          const bounds = new google.maps.LatLngBounds();
+          features.forEach(f => {
+            f.getGeometry().forEachLatLng(p => bounds.extend(p));
+          });
+          map.fitBounds(bounds);
+
+          document.getElementById('chip').textContent = 'Mapa listo.';
+          resolve();
+        });
+      });
+    }
+
+    async function showInfo(name, type = 'Comuna') {
       const box = document.getElementById('comune-info-card');
+      const headerType = document.getElementById('info-header-type');
+
+      if (headerType) {
+        // Map type "Region" -> "Región" for display
+        headerType.textContent = (type === 'Region') ? 'Región' : type;
+      }
+
+      // ... (Rest of existing showInfo logic remains mostly same)
       const headerName = document.getElementById('info-header-name');
       const mayorName = document.getElementById('info-mayor-name');
       const officeParty = document.getElementById('info-office-party');
@@ -321,16 +378,21 @@
       const votesEl = document.getElementById('info-votes');
       const populationEl = document.getElementById('info-population');
       const budgetEl = document.getElementById('info-budget');
+      const concejalesList = document.getElementById('info-concejales-list'); // Ensure this ID exists in HTML or handle missing
 
+      // Clear previous
       if (headerName) headerName.textContent = name;
-      if (mayorName) mayorName.textContent = '';
+      if (mayorName) mayorName.textContent = 'Cargando...';
       if (officeParty) officeParty.textContent = '';
       if (termStart) termStart.textContent = '';
       if (termEnd) termEnd.textContent = '';
       if (termProgress) termProgress.style.width = '0%';
       if (votesEl) votesEl.textContent = '';
+      if (concejalesList) concejalesList.innerHTML = '';
       if (populationEl) populationEl.textContent = '';
       if (budgetEl) budgetEl.textContent = '';
+
+      box.style.display = 'block';
 
       try {
         const res = await fetch(`/wp-json/politeia/v1/jurisdictions?name=${encodeURIComponent(name)}`);
@@ -354,15 +416,11 @@
               const ratio = Math.min(Math.max((now - start) / (end - start), 0), 1);
               termProgress.style.width = (ratio * 100) + '%';
             }
-            if (votesEl && data.votes !== null && data.votes !== undefined) {
-              votesEl.textContent = sprintf(
-                __('Votes: %s', 'politeia-electoral-map'),
-                Number(data.votes).toLocaleString('es-CL')
-              );
+            if (votesEl && data.votes) {
+              votesEl.textContent = sprintf('Votos: %s', Number(data.votes).toLocaleString('es-CL'));
             }
 
-            // Fetch concejales
-            const concejalesList = document.getElementById('info-concejales-list');
+            // Concejales logic
             if (concejalesList) {
               try {
                 const concRes = await fetch(`/wp-json/politeia/v1/concejales?name=${encodeURIComponent(name)}`);
@@ -375,133 +433,187 @@
                   } else {
                     concejalesList.innerHTML = '<div style="font-size: 12px; color: #6b7280;">No hay datos disponibles</div>';
                   }
-                } else {
-                  concejalesList.innerHTML = '';
                 }
-              } catch (e) {
-                concejalesList.innerHTML = '';
-              }
+              } catch (e) { }
             }
 
-            if (populationEl && data.population !== null && data.population !== undefined) {
-              populationEl.textContent = sprintf(
-                __('Population: %s', 'politeia-electoral-map'),
-                Number(data.population).toLocaleString('es-CL')
-              );
+            if (populationEl && data.population) {
+              populationEl.textContent = sprintf('Población: %s', Number(data.population).toLocaleString('es-CL'));
             }
-            if (budgetEl && data.budget !== null && data.budget !== undefined) {
-              budgetEl.textContent = `Presupuesto Anual Municipal: $${Number(data.budget).toLocaleString('es-CL')}`;
+            if (budgetEl && data.budget) {
+              budgetEl.textContent = `Presupuesto: $${Number(data.budget).toLocaleString('es-CL')}`;
             }
-          } else if (mayorName) {
-            mayorName.textContent = 'No hay datos disponibles.';
+
+          } else {
+            if (mayorName) mayorName.textContent = 'No hay datos disponibles.';
           }
-        } else if (mayorName) {
-          mayorName.textContent = 'Error al cargar datos.';
         }
       } catch (e) {
         if (mayorName) mayorName.textContent = 'Error al cargar datos.';
       }
-
-      box.style.display = 'block';
     }
 
-    // --- Fit con offset a "2/3 derecha" (configurable) ---
-    function fitFeatureWithOffset(feature, {
-      padding = { top: 80, right: 20, bottom: 20, left: 20 },
-      xRatio = 2 / 3,   // 0 = borde izq … 0.5 = centro … 1 = borde der
-      yRatio = 0.5,   // 0 = arriba … 0.5 = centro … 1 = abajo
-      onDone = null
-    } = {}) {
-      const bounds = new google.maps.LatLngBounds();
-      feature.getGeometry().forEachLatLng(p => bounds.extend(p));
+    // --- Search & Interaction ---
 
-      // 1) Ajusta a los límites
-      map.fitBounds(bounds, padding);
-
-      // 2) Cuando termina, desplaza para dejar la comuna en ~2/3 der.
-      google.maps.event.addListenerOnce(map, 'idle', () => {
-        const div = map.getDiv();
-        const w = div.clientWidth, h = div.clientHeight;
-        const panX = (0.5 - xRatio) * w;
-        const panY = (0.5 - yRatio) * h;
-        map.panBy(panX, panY);
-        if (typeof onDone === 'function') {
-          google.maps.event.addListenerOnce(map, 'idle', onDone);
-        }
-      });
-    }
-
-    function buildIndex(feature) {
-      const name = comunaName(feature);
-      const provincia = provinciaName(feature);
-      idxByName.set(norm(name), { name, provincia, feature });
-    }
-
-    function renderSuggestions(items) {
+    function renderSuggestions(hits) {
       const box = document.getElementById('suggestions');
-      if (!items.length) { box.classList.remove('visible'); box.innerHTML = ''; return; }
-      box.innerHTML = items.map(it => `
-        <div class="suggestion" data-key="${it.key}">
-          <span>${it.name}</span>${it.provincia ? `<small>${it.provincia}</small>` : ''}
-        </div>`).join('');
-      box.classList.add('visible');
-      box.querySelectorAll('.suggestion').forEach(el => el.addEventListener('click', () => selectByKey(el.dataset.key)));
-    }
+      if (!hits.length) { box.classList.remove('visible'); box.innerHTML = ''; return; }
 
-    function selectByKey(key) {
-      const hit = idxByName.get(key);
-      if (!hit) return;
-      highlight(hit.feature);
-      fitFeatureWithOffset(hit.feature, { xRatio: 2 / 3, yRatio: 0.5, onDone: () => showInfo(hit.name) });
-      document.getElementById('q').value = hit.name;
-      document.getElementById('chip').textContent = hit.name;
-      document.getElementById('suggestions').classList.remove('visible');
+      box.innerHTML = hits.map(hit => {
+        // Display distinction: "Arica (Comuna)" vs "Arica (Provincia)"
+        const typeLabel = hit.type === 'Region' ? 'Región' : hit.type;
+        return `
+        <div class="suggestion" data-key="${hit.key}" data-file="${hit.file}" data-type="${hit.type}" data-label="${hit.label}">
+          <span>${hit.label}</span>
+          <small>${typeLabel}</small>
+        </div>`;
+      }).join('');
+
+      box.classList.add('visible');
+
+      box.querySelectorAll('.suggestion').forEach(el => {
+        el.addEventListener('click', () => {
+          const item = {
+            key: el.dataset.key,
+            file: el.dataset.file,
+            type: el.dataset.type,
+            label: el.dataset.label
+          };
+          selectItem(item);
+        });
+      });
     }
 
     function search(q) {
       const nq = norm(q);
-      if (!nq) return [];
-      const all = [];
-      for (const [key, meta] of idxByName.entries()) {
-        if (key.startsWith(nq)) all.push({ key, ...meta, score: 0 });
-        else if (key.includes(nq)) all.push({ key, ...meta, score: 1 });
+      if (!nq || nq.length < 2) return []; // Min 2 chars
+
+      const hits = [];
+      for (const item of masterIndex) {
+        if (item.key.includes(nq)) {
+          // Simple scoring: startsWith > includes
+          const score = item.key.startsWith(nq) ? 0 : 1;
+          hits.push({ ...item, score });
+        }
       }
-      all.sort((a, b) => a.score - b.score || a.name.localeCompare(b.name, 'es'));
-      return all.slice(0, 12);
+
+      hits.sort((a, b) => a.score - b.score || a.label.localeCompare(b.label));
+      return hits.slice(0, 10);
     }
 
-    // --- Google Maps bootstrap ---
+    async function selectItem(item) {
+      // 1. Check if we need to load a different map file
+      if (item.file !== currentRegionFile) {
+        await loadRegion(item.file);
+      }
+
+      document.getElementById('q').value = item.label; // Update search bar immediately
+      document.getElementById('suggestions').classList.remove('visible'); // Hide suggestions
+
+      if (item.type === 'Region') {
+        // For Regions, we don't highlight a specific polygon because the file IS the region.
+        // loadRegion has already fit the bounds. A specific feature lookup will fail.
+
+        // Clear previous highlight
+        highlight(null);
+
+        // Show Chip
+        document.getElementById('chip').textContent = item.label;
+
+        // Show Info Card for the Region
+        showInfo(item.label, 'Region');
+        return;
+      }
+
+      // 2. Find feature in the now-loaded local data
+      //    Note: The 'key' in index was normalized name. featureName also returns proper name.
+      const feature = currentRegionData.get(norm(item.label));
+
+      if (feature) {
+        highlight(feature);
+
+        // 3. Zoom/Pan
+        fitFeatureWithOffset(feature, {
+          xRatio: 2 / 3, yRatio: 0.5, onDone: () => {
+            // 4. Show Info
+            showInfo(item.label, item.type);
+          }
+        });
+
+        document.getElementById('chip').textContent = item.label;
+      } else {
+        console.warn('Feature not found in map data:', item.label);
+        document.getElementById('chip').textContent = 'Mapa cargado, pero no se encontró el polígono.';
+      }
+    }
+
+    // --- Fit & Pan Helper ---
+    function fitFeatureWithOffset(feature, { padding, xRatio, yRatio, onDone } = {}) {
+      const bounds = new google.maps.LatLngBounds();
+      feature.getGeometry().forEachLatLng(p => bounds.extend(p));
+      map.fitBounds(bounds, padding || { top: 50, right: 50, bottom: 50, left: 50 });
+
+      google.maps.event.addListenerOnce(map, 'idle', () => {
+        const div = map.getDiv();
+        const panX = (0.5 - (xRatio || 0.5)) * div.clientWidth;
+        const panY = (0.5 - (yRatio || 0.5)) * div.clientHeight;
+        map.panBy(panX, panY);
+        if (onDone) google.maps.event.addListenerOnce(map, 'idle', onDone);
+      });
+    }
+
+    // --- Init ---
     window.initMap = function () {
       map = new google.maps.Map(document.getElementById('map'), {
         center: { lat: -33.45, lng: -70.66 }, zoom: 9,
-        mapTypeControl: false, streetViewControl: false, fullscreenControl: true, clickableIcons: false
+        mapTypeControl: false, streetViewControl: false, fullscreenControl: true, clickableIcons: false,
+        backgroundColor: '#e5e7eb', // Better background color for loading
       });
       map.data.setStyle(styleFeature);
 
-      map.data.addListener('mouseover', e => { document.getElementById('chip').textContent = comunaName(e.feature); });
-      map.data.addListener('mouseout', e => { document.getElementById('chip').textContent = highlighted ? comunaName(highlighted) : 'Selecciona una comuna'; });
+      // Interactions
+      map.data.addListener('mouseover', e => {
+        const n = featureName(e.feature);
+        if (n) document.getElementById('chip').textContent = n;
+      });
+      map.data.addListener('mouseout', e => {
+        document.getElementById('chip').textContent = highlighted ? featureName(highlighted) : 'Politeia Map';
+      });
       map.data.addListener('dblclick', e => {
-        const name = comunaName(e.feature);
+        const name = featureName(e.feature);
+
+        // Infer type from feature props (simplistic)
+        // If it has 'Comuna' prop, it's Comuna. If 'Provincia' is the main name, it's that.
+        // For standard clicks we assume Comuna mode if using Comuna file.
+        // We can check currentRegionFile to guess type if needed.
+
         highlight(e.feature);
         fitFeatureWithOffset(e.feature, { xRatio: 2 / 3, yRatio: 0.5, onDone: () => showInfo(name) });
         document.getElementById('q').value = name;
-        document.getElementById('chip').textContent = name;
       });
 
-      map.data.loadGeoJson(GEOJSON_URL, null, () => {
-        map.data.forEach(f => buildIndex(f));
-        document.getElementById('chip').textContent = 'Mapa listo.';
-      });
+      // Load Master Index
+      fetch(INDEX_URL).then(r => r.json()).then(idx => {
+        masterIndex = idx;
+        console.log('Master Index Loaded:', masterIndex.length);
+      }).catch(e => console.error('Failed to load search index', e));
 
+      // Initial Load: RM
+      loadRegion(DEFAULT_REGION_FILE);
+
+      // Search Listeners
       const input = document.getElementById('q');
       const box = document.getElementById('suggestions');
+
       input.addEventListener('input', () => renderSuggestions(search(input.value)));
+
       input.addEventListener('keydown', e => {
         if (e.key === 'Enter') {
           const hits = search(input.value);
-          if (hits.length) selectByKey(hits[0].key);
+          if (hits.length) selectItem(hits[0]);
         } else if (e.key === 'Escape') box.classList.remove('visible');
       });
+
       document.addEventListener('click', e => { if (!e.target.closest('.toolbar')) box.classList.remove('visible'); });
     };
 
@@ -511,7 +623,7 @@
       s.async = true; s.defer = true;
       document.head.appendChild(s);
     } else {
-      document.getElementById('chip').textContent = 'Falta api_key en el iframe (?api_key=)';
+      document.getElementById('chip').textContent = 'Falta api_key';
     }
   </script>
 </body>

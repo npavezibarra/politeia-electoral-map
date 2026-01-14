@@ -56,53 +56,12 @@ class Jurisdictions extends Controller
 		$parties = $wpdb->prefix . 'politeia_political_organizations';
 		$office_terms = $wpdb->prefix . 'politeia_office_terms';
 
-
-		// 1. Resolve Jurisdiction ID with robust matching
-		// Try exact match first
+		// 1. Resolve Jurisdiction ID first
 		$jur_row = $wpdb->get_row($wpdb->prepare(
 			"SELECT id, official_name, common_name FROM $jurisdictions WHERE official_name = %s OR common_name = %s",
 			$name,
 			$name
 		));
-
-		if (!$jur_row) {
-			// Try normalized variations
-			// 1. Remove "Región " prefix (case insensitive in logic, but let's be explicit)
-			$clean_name = trim(str_ireplace('Región ', '', $name));
-
-			// 2. Try exact match with cleaned name (e.g. "de Atacama" -> "DE ATACAMA")
-			$jur_row = $wpdb->get_row($wpdb->prepare(
-				"SELECT id, official_name, common_name FROM $jurisdictions WHERE official_name = %s OR common_name = %s",
-				$clean_name,
-				$clean_name
-			));
-		}
-
-		if (!$jur_row && !empty($clean_name)) {
-			// 3. Try LIKE match (e.g. "Metropolitana" -> matches "METROPOLITANA DE SANTIAGO")
-			// We search for official_name containing the clean name.
-			$like_query = '%' . $wpdb->esc_like($clean_name) . '%';
-			$jur_row = $wpdb->get_row($wpdb->prepare(
-				"SELECT id, official_name, common_name FROM $jurisdictions WHERE official_name LIKE %s OR common_name LIKE %s LIMIT 1",
-				$like_query,
-				$like_query
-			));
-		}
-
-		// Fallback for tricky cases (e.g. "O'Higgins" vs "Del Libertador...")
-		// If clean_name has "de ", try removing it too? 
-		// "de Atacama" -> "Atacama".
-		if (!$jur_row && !empty($clean_name)) {
-			$cleaner_name = trim(str_ireplace('de ', '', $clean_name)); // Remove leading 'de '
-			if ($cleaner_name !== $clean_name) {
-				$like_query_2 = '%' . $wpdb->esc_like($cleaner_name) . '%';
-				$jur_row = $wpdb->get_row($wpdb->prepare(
-					"SELECT id, official_name, common_name FROM $jurisdictions WHERE official_name LIKE %s OR common_name LIKE %s LIMIT 1",
-					$like_query_2,
-					$like_query_2
-				));
-			}
-		}
 
 		if (!$jur_row) {
 			return new \WP_REST_Response(array('found' => false), 200);
@@ -113,21 +72,23 @@ class Jurisdictions extends Controller
 		$common_name = $jur_row->common_name;
 
 		// 2. Try to find an ACTIVE Office Term (e.g. Governor)
-		// Modified to fetch votes from Candidacies if available
+		// We join with Elections to get votes if possible, but terms might not link to elections directly in some schemas.
+		// In our schema, OfficeTerms has no election_id. Candidacies do.
+		// For Governors imported from CSV, we created OfficeTerms. 
+		// We did NOT link them to Candidacies or Elections in the simple importer (wait, let's check importer).
+		// Importer: create_office_term($person_id, $office_id, $jur_id). No election linkage there.
+		// So we won't get votes/percentage from OfficeTerm query effortlessly unless we try to find a matching Candidacy.
+		// For the Info Card, "Votes" is displayed.
+		// If we want Votes, we should try to finding the candidacy too or just accept null votes for now.
+		// Let's try to fetch basic info first.
+
 		$term_query = "SELECT 
 				CONCAT_WS(' ', p.given_names, p.paternal_surname, p.maternal_surname) AS person_name,
 				o.title AS office_title,
 				t.started_on,
-				NULL as planned_end_on,
-				NULL as party_short_name,
-				(
-                    SELECT c.votes 
-                    FROM $candidacies c
-                    WHERE c.person_id = t.person_id 
-                      AND c.jurisdiction_id = t.jurisdiction_id
-                      AND c.elected = 1
-                    ORDER BY c.id DESC LIMIT 1
-                ) as votes
+				NULL as planned_end_on, -- Calculate or fetch
+				NULL as party_short_name, -- Need Party Membership lookup for high perfection, but maybe optional
+				NULL as votes
 			FROM $office_terms t
 			INNER JOIN $people p ON p.id = t.person_id
 			INNER JOIN $offices o ON o.id = t.office_id
@@ -146,10 +107,10 @@ class Jurisdictions extends Controller
 					'person_name' => trim($term_row['person_name']),
 					'photo_url' => null,
 					'office_title' => $term_row['office_title'],
-					'party_short_name' => '', // TODO: Fetch from memberships
+					'party_short_name' => '', // TODO: Fetch from memberships if needed
 					'started_on' => $term_row['started_on'],
 					'planned_end_on' => date('Y-m-d', strtotime($term_row['started_on'] . ' + 4 years')),
-					'votes' => $term_row['votes'], // Now utilizing fetched votes
+					'votes' => 'N/A', // Placeholder until we link candidacy
 					'population' => null,
 					'budget' => null,
 				),

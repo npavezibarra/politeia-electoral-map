@@ -93,6 +93,7 @@ if (file_exists($rest_juris_file)) {
 	require_once $rest_juris_file;
 }
 
+
 /**
  * REST controller para obtener concejales de comunas.
  * Ruta: includes/Modules/REST/class-concejales.php
@@ -101,6 +102,22 @@ $rest_concejales_file = PLEM_DIR . 'includes/Modules/REST/class-concejales.php';
 if (file_exists($rest_concejales_file)) {
 	require_once $rest_concejales_file;
 }
+
+/**
+ * Governor Importer (ETL)
+ */
+$governor_importer_file = PLEM_DIR . 'includes/Modules/ETL/GovernorImporter.php';
+if (file_exists($governor_importer_file)) {
+	require_once $governor_importer_file;
+}
+
+add_shortcode('politeia_import_governors', function () {
+	if (!current_user_can('manage_options')) {
+		return 'Access Denied';
+	}
+	\Politeia\Modules\ETL\GovernorImporter::run();
+	return 'Import Process Initiated. Check output above.';
+});
 
 // ======================================================
 // Load Database Installer (required by Activator)
