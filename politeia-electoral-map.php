@@ -3,7 +3,7 @@
  * Plugin Name:       Politeia Electoral Map
  * Plugin URI:        https://github.com/npavezibarra/politeia-electoral-map
  * Description:       Visualizador electoral de Chile (mapas + datos). Paso 1: mapa en iframe con búsqueda de comunas RM.
- * Version:           0.2.5
+ * Version:           0.2.6
  * Author:            Politeia
  * Author URI:        https://politeia.cl
  * License:           GPL-2.0-or-later
@@ -31,10 +31,10 @@ if (!defined('PLEM_URL')) {
 	define('PLEM_URL', plugin_dir_url(__FILE__));
 }
 if (!defined('PLEM_VERSION')) {
-	define('PLEM_VERSION', '0.2.5');
+	define('PLEM_VERSION', '0.2.6');
 }
 if (!defined('PLEM_DB_VERSION')) {
-	define('PLEM_DB_VERSION', '0.2.5');
+	define('PLEM_DB_VERSION', '0.2.6');
 }
 
 // ======================================================
@@ -98,10 +98,20 @@ if (file_exists($rest_juris_file)) {
  * REST controller para obtener concejales de comunas.
  * Ruta: includes/Modules/REST/class-concejales.php
  */
-$rest_concejales_file = PLEM_DIR . 'includes/Modules/REST/class-concejales.php';
-if (file_exists($rest_concejales_file)) {
-	require_once $rest_concejales_file;
+$rest_conce_file = PLEM_DIR . 'includes/Modules/REST/class-concejales.php';
+if (file_exists($rest_conce_file)) {
+	require_once $rest_conce_file;
 }
+
+/**
+ * REST controller para obtener distritos electorales.
+ * Ruta: includes/Modules/REST/class-districts.php
+ */
+$rest_dist_file = PLEM_DIR . 'includes/Modules/REST/class-districts.php';
+if (file_exists($rest_dist_file)) {
+	require_once $rest_dist_file;
+}
+
 
 
 

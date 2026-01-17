@@ -61,6 +61,7 @@ class Upgrader
                         $wpdb->prefix . 'politeia_election_results',              // NEW
                         $wpdb->prefix . 'politeia_candidacies',
                         $wpdb->prefix . 'politeia_party_leanings',                // NEW
+                        $wpdb->prefix . 'politeia_jurisdiction_memberships',      // NEW
                 );
 
                 $missing = false;

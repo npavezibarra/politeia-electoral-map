@@ -155,7 +155,7 @@
     }
 
     #info-mayor-party {
-      font-size: 13px;
+      font-size: 10px;
       color: #6b7280;
       margin-top: 2px;
     }
@@ -201,6 +201,33 @@
     #info-term-label {
       font-size: 10px;
       letter-spacing: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+
+    .term-nav-arrow {
+      cursor: pointer;
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      color: #6b7280;
+      transition: background-color 0.2s;
+    }
+
+    .term-nav-arrow:hover {
+      background-color: #f3f4f6;
+      color: #111827;
+    }
+
+    .term-nav-arrow svg {
+      width: 12px;
+      height: 12px;
+      fill: currentColor;
     }
 
     #info-header-name {
@@ -211,7 +238,48 @@
     #info-mayor-name {
       font-size: 20px;
       font-weight: 700;
+      font-weight: 700;
       line-height: 1;
+    }
+
+    #info-header-population {
+      font-size: 11px;
+      color: #6b7280;
+      margin-top: 4px;
+      font-weight: 500;
+      letter-spacing: 0.5px;
+    }
+
+    /* Vote Bar Styles */
+    .vote-bar-container {
+      margin-top: 10px;
+    }
+
+    .vote-bar-bg {
+      width: 100%;
+      height: 6px;
+      background: #bfdbfe;
+      /* Light Blue 200 */
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 4px;
+    }
+
+    .vote-bar-fill {
+      height: 100%;
+      background: #1d4ed8;
+      /* Intense Blue 700 */
+      width: 0%;
+      transition: width 1s ease-out;
+    }
+
+    .vote-stats {
+      display: flex;
+      justify-content: space-between;
+      font-size: 7px;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
 
     .hint {
@@ -242,6 +310,7 @@
         <div id="info-header-type">Comuna</div>
         <div id="info-header-name"></div>
         <div id="info-header-region"></div>
+        <div id="info-header-population"></div>
       </div>
       <div id="INFOCARD-COMMUNE">
         <div id="info-mayor">
@@ -252,8 +321,24 @@
             <div id="info-mayor-party"></div>
           </div>
         </div>
+        <div id="info-votes"></div>
+        <hr />
         <div id="info-term">
-          <div id="info-term-label">PERÍODO</div>
+          <div id="info-term-label">
+            <div role="button" tabindex="0" class="term-nav-arrow" id="term-prev" aria-label="Previous Period">
+              <svg viewBox="0 0 320 512">
+                <path
+                  d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l192 192c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 278.6 86.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-192 192z" />
+              </svg>
+            </div>
+            <span>PERÍODO</span>
+            <div role="button" tabindex="0" class="term-nav-arrow" id="term-next" aria-label="Next Period">
+              <svg viewBox="0 0 320 512">
+                <path
+                  d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-192 192c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 41.4 86.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l192 192z" />
+              </svg>
+            </div>
+          </div>
           <div id="info-term-bar">
             <div id="info-term-progress"></div>
           </div>
@@ -263,15 +348,13 @@
           </div>
         </div>
         <hr />
-        <div id="info-votes"></div>
-        <hr />
         <div id="info-concejales">
           <div style="font-size: 10px; letter-spacing: 4px; margin-bottom: 8px;">CONCEJALES:</div>
           <div id="info-concejales-list"></div>
         </div>
         <hr />
-        <div id="info-population"></div>
         <hr />
+        <!-- info-population removed from here -->
         <div id="info-budget"></div>
       </div>
     </div>
@@ -296,6 +379,11 @@
     let masterIndex = []; // The global search index
     let currentRegionFile = null;
     let currentRegionData = new Map(); // Index of features in the current view
+
+    // Temporal Navigation State
+    let currentDate = new Date(); // To simulate "Active Date"
+    let currentEntityName = null;
+    let currentEntityType = 'Comuna';
 
     // --- Utils ---
     const norm = s => (s || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
@@ -379,13 +467,20 @@
       });
     }
 
-    async function showInfo(name, type = 'Comuna') {
+    async function showInfo(name, type = 'Comuna', dateObj = null) {
+      // Update State
+      currentEntityName = name;
+      currentEntityType = type;
+      if (dateObj) currentDate = dateObj; // Only update if passed explicitly, else keep current nav state
+
+      const targetDateStr = currentDate.toISOString().slice(0, 10); // YYYY-MM-DD
+
       const box = document.getElementById('comune-info-card');
       const headerType = document.getElementById('info-header-type');
 
       if (headerType) {
         // Map type "Region" -> "Región" for display
-        headerType.textContent = (type === 'Region') ? 'Región' : type;
+        headerType.textContent = (type === 'Region') ? 'Región' : ((type === 'District') ? 'Distrito' : type);
       }
 
       const headerName = document.getElementById('info-header-name');
@@ -396,8 +491,9 @@
       const termStart = document.getElementById('info-term-start');
       const termEnd = document.getElementById('info-term-end');
       const termProgress = document.getElementById('info-term-progress');
+      // const votesEl = document.getElementById('info-votes'); // Removed duplicate
       const votesEl = document.getElementById('info-votes');
-      const populationEl = document.getElementById('info-population');
+      const populationEl = document.getElementById('info-header-population');
       const budgetEl = document.getElementById('info-budget');
       const concejalesList = document.getElementById('info-concejales-list');
 
@@ -417,8 +513,34 @@
 
       box.style.display = 'block';
 
+      // --- District / Circunscripción Special Handling ---
+      if (type === 'District' || type === 'Distrito' || type === 'Circunscripción') {
+        if (headerName) headerName.textContent = name;
+
+        // Hide standard sections not needed for District/Circ
+        if (document.getElementById('info-mayor')) document.getElementById('info-mayor').style.display = 'none';
+        if (document.getElementById('info-mayor-photo')) document.getElementById('info-mayor-photo').style.display = 'none';
+
+        if (votesEl) votesEl.style.display = 'none';
+        if (concejalesList) document.getElementById('info-concejales').style.display = 'none';
+        if (budgetEl) budgetEl.style.display = 'none';
+
+        // Show Period Nav
+        if (termStart) termStart.textContent = '2022';
+        if (termEnd) termEnd.textContent = '2030';
+
+        // Let it fetch
+      } else {
+        // Reset displays for non-district (Comuna/Region/Circunscripción)
+        if (document.getElementById('info-mayor')) document.getElementById('info-mayor').style.display = 'flex';
+        if (document.getElementById('info-mayor-photo')) document.getElementById('info-mayor-photo').style.display = 'block';
+        if (votesEl) votesEl.style.display = 'block';
+        if (concejalesList) document.getElementById('info-concejales').style.display = 'block';
+        if (budgetEl) budgetEl.style.display = 'block';
+      }
+
       try {
-        const res = await fetch(`/wp-json/politeia/v1/jurisdictions?name=${encodeURIComponent(name)}`);
+        const res = await fetch(`/wp-json/politeia/v1/jurisdictions?name=${encodeURIComponent(name)}&date=${targetDateStr}`);
         if (res.ok) {
           const data = await res.json();
           if (data.found) {
@@ -431,6 +553,12 @@
 
             if (termStart) termStart.textContent = data.started_on || '';
             if (termEnd) termEnd.textContent = data.planned_end_on || '';
+
+            // Re-show photo if we have one and we aren't in District/Circ mode 
+            if (type !== 'District' && type !== 'Distrito' && type !== 'Circunscripción') {
+              if (document.getElementById('info-mayor-photo')) document.getElementById('info-mayor-photo').style.display = 'block';
+            }
+
             if (termProgress && data.started_on && data.planned_end_on) {
               const start = new Date(data.started_on);
               const end = new Date(data.planned_end_on);
@@ -438,14 +566,34 @@
               const ratio = Math.min(Math.max((now - start) / (end - start), 0), 1);
               termProgress.style.width = (ratio * 100) + '%';
             }
-            if (votesEl && data.votes) {
-              votesEl.textContent = sprintf('Votos: %s', Number(data.votes).toLocaleString('es-CL'));
+            if (votesEl && type !== 'District' && type !== 'Distrito' && type !== 'Circunscripción') {
+              if (data.votes && data.total_votes && Number(data.total_votes) > 0) {
+                const v = Number(data.votes);
+                const tv = Number(data.total_votes);
+                const percent = Math.min((v / tv) * 100, 100);
+
+                votesEl.innerHTML = `
+                    <div class="vote-bar-container">
+                        <div class="vote-bar-bg">
+                        <div class="vote-bar-fill" style="width: ${percent}%;"></div>
+                        </div>
+                        <div class="vote-stats">
+                        <span>Votos: ${v.toLocaleString('es-CL')}</span>
+                        <span>Votantes: ${tv.toLocaleString('es-CL')}</span>
+                        </div>
+                    </div>`;
+              } else if (data.votes) {
+                // Fallback if no total_votes
+                votesEl.textContent = sprintf('Votos: %s', Number(data.votes).toLocaleString('es-CL'));
+              } else {
+                votesEl.innerHTML = '';
+              }
             }
 
             // Concejales logic
-            if (concejalesList) {
+            if (concejalesList && type !== 'District' && type !== 'Distrito' && type !== 'Circunscripción') {
               try {
-                const concRes = await fetch(`/wp-json/politeia/v1/concejales?name=${encodeURIComponent(name)}`);
+                const concRes = await fetch(`/wp-json/politeia/v1/concejales?name=${encodeURIComponent(name)}&date=${targetDateStr}`);
                 if (concRes.ok) {
                   const concData = await concRes.json();
                   if (concData.found && concData.concejales && concData.concejales.length > 0) {
@@ -466,12 +614,29 @@
               budgetEl.textContent = `Presupuesto: $${Number(data.budget).toLocaleString('es-CL')}`;
             }
 
+            // Show Debug Message if present (User requested "COULDNT FIND DATA" details)
+            if (data.debug_message) {
+              console.log('Debug:', data.debug_message);
+              // We can append it to title or name if needed, or just log it.
+              // For "COULDNT FIND DATA", see below in else block.
+            }
+
           } else {
-            if (mayorName) mayorName.textContent = 'No hay datos disponibles.';
+            console.log('API found: false', data);
+
+            let msg = 'No hay datos disponibles.';
+            if (data.debug_info) {
+              msg += ' [DEBUG: ' + data.debug_info + ']';
+            }
+            if (mayorName) mayorName.textContent = msg;
+
+            // Ensure container is visible to show message
+            if (document.getElementById('info-mayor')) document.getElementById('info-mayor').style.display = 'flex';
           }
         }
       } catch (e) {
-        if (mayorName) mayorName.textContent = 'Error al cargar datos.';
+        if (mayorName) mayorName.textContent = 'Error al cargar datos. ' + e.message;
+        if (document.getElementById('info-mayor')) document.getElementById('info-mayor').style.display = 'flex';
       }
     }
 
@@ -532,27 +697,64 @@
       document.getElementById('q').value = item.label; // Update search bar immediately
       document.getElementById('suggestions').classList.remove('visible'); // Hide suggestions
 
+      // Clear all previous highlights
+      map.data.forEach(f => f.setProperty('isHighlighted', false));
+      highlighted = null; // Reset single tracker
+
       if (item.type === 'Region') {
-        // For Regions, we don't highlight a specific polygon because the file IS the region.
-        // loadRegion has already fit the bounds. A specific feature lookup will fail.
-
-        // Clear previous highlight
-        highlight(null);
-
         // Show Chip
         document.getElementById('chip').textContent = item.label;
-
         // Show Info Card for the Region
         showInfo(item.label, 'Region');
         return;
       }
 
-      // 2. Find feature in the now-loaded local data
-      //    Note: The 'key' in index was normalized name. featureName also returns proper name.
+      if (item.type === 'District' || item.type === 'Distrito' || item.type === 'Circunscripción') {
+        const isCirc = (item.type === 'Circunscripción');
+
+        // Highlighting Logic for District/Circ (Multiple Communes)
+        const bounds = new google.maps.LatLngBounds();
+        let foundAny = false;
+
+        // Communes list from the index item
+        const communes = item.communes || [];
+        // ... (highlighting logic remains the same)
+        communes.forEach(cName => {
+          const feature = currentRegionData.get(norm(cName));
+          if (feature) {
+            feature.setProperty('isHighlighted', true);
+            feature.getGeometry().forEachLatLng(p => bounds.extend(p));
+            foundAny = true;
+          }
+        });
+
+        if (foundAny) {
+          // Fit combined bounds
+          const cardWidth = 350;
+          const margin = 80;
+          map.fitBounds(bounds, {
+            top: margin,
+            right: margin,
+            bottom: margin,
+            left: cardWidth + margin
+          });
+        } else {
+          console.warn('No communes found for district:', item.label);
+        }
+
+        document.getElementById('chip').textContent = item.label;
+        // Display Info
+        // Pass specific type to showInfo
+        showInfo(item.label, isCirc ? 'Circunscripción' : 'District');
+
+        return;
+      }
+
+      // 2. Find feature in the now-loaded local data (Standard Comuna/Provincia)
       const feature = currentRegionData.get(norm(item.label));
 
       if (feature) {
-        highlight(feature);
+        highlight(feature); // Use helper for single feature
 
         // 3. Zoom/Pan
         fitFeatureWithOffset(feature, {
@@ -647,11 +849,52 @@
         document.getElementById('q').value = name;
       });
 
-      // Load Master Index
-      fetch(INDEX_URL).then(r => r.json()).then(idx => {
+      // Load Master Index & Districts
+      Promise.all([
+        fetch(INDEX_URL).then(r => r.json()),
+        fetch('/wp-json/politeia/v1/districts').then(r => r.ok ? r.json() : [])
+      ]).then(([idx, districts]) => {
         masterIndex = idx;
-        console.log('Master Index Loaded:', masterIndex.length);
-      }).catch(e => console.error('Failed to load search index', e));
+
+        // Process Districts
+        // We need to map Districts to Files. 
+        // We assume all communes of a district are in the same Region File (mostly true).
+        // We find one of the communes in masterIndex to get the file.
+        districts.forEach(d => {
+          // Find a commune in index
+          const sampleCommune = d.communes.find(cName => {
+            const n = norm(cName);
+            return masterIndex.find(i => i.key === n);
+          });
+
+          if (sampleCommune) {
+            const indexEntry = masterIndex.find(i => i.key === norm(sampleCommune));
+            if (indexEntry) {
+              file = indexEntry.file;
+              regionId = indexEntry.regionId;
+            }
+          }
+
+          // Determine Type based on API field or name.
+          // API field 'type' was added in class-districts.php.
+          // Note: d.type might be 'Circunscripción' or 'District'.
+          const dName = d.name.toUpperCase();
+          const isSenatorial = d.type === 'Circunscripción' || d.name.includes('Circunscripción') || dName.includes('CIRCUNSCRIPCI');
+          const typeLabel = (d.type === 'Circunscripción' || isSenatorial) ? 'Circunscripción' : 'District';
+
+          // Add to master index
+          masterIndex.push({
+            label: d.name,
+            key: norm(d.name), // Normalize for Consistent Searching
+            type: typeLabel,
+            file: file,
+            regionId: regionId,
+            communes: d.communes
+          });
+        });
+
+        console.log('Master Index Loaded (including Districts/Circunscripciones):', masterIndex.length);
+      }).catch(e => console.error('Failed to load search index/districts', e));
 
       // Initial Load: RM
       loadRegion(DEFAULT_REGION_FILE);
@@ -670,7 +913,30 @@
       });
 
       document.addEventListener('click', e => { if (!e.target.closest('.toolbar')) box.classList.remove('visible'); });
+
+      // Temporal Navigation Listeners
+      document.getElementById('term-prev').addEventListener('click', () => navigatePeriod(-1));
+      document.getElementById('term-next').addEventListener('click', () => navigatePeriod(1));
     };
+
+    function navigatePeriod(direction) {
+      if (!currentEntityName) return;
+
+      // Logic: Context-Aware Jump
+      // Commune/Region: 4 years
+      // District: 8 years
+      let years = 4;
+      if (currentEntityType === 'Distrito' || currentEntityType === 'District') {
+        years = 8;
+      }
+
+      // Adjust Year
+      // We jump by 'years' amount from the current Active Date
+      currentDate.setFullYear(currentDate.getFullYear() + (direction * years));
+
+      // Refresh Info
+      showInfo(currentEntityName, currentEntityType, currentDate);
+    }
 
     if (API_KEY) {
       const s = document.createElement('script');

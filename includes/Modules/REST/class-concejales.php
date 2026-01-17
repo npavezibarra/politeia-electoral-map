@@ -54,6 +54,11 @@ class Concejales extends Controller
         $offices = $wpdb->prefix . 'politeia_offices';
         $parties = $wpdb->prefix . 'politeia_political_organizations';
 
+        $target_date = $req->get_param('date');
+        if (!$target_date) {
+            $target_date = current_time('Y-m-d');
+        }
+
         /* phpcs:disable WordPress.DB.PreparedSQL.NotPrepared */
         $query = "SELECT 
 			CONCAT_WS(' ', p.given_names, p.paternal_surname, p.maternal_surname) AS person_name,
@@ -73,6 +78,7 @@ class Concejales extends Controller
 		      FROM %s e2
 		      INNER JOIN %s o2 ON o2.id = e2.office_id
 		      WHERE o2.code = 'CONCEJAL'
+		        AND e2.election_date <= %%s
 		  )
 		ORDER BY c.votes DESC
 		LIMIT 15";
@@ -90,7 +96,8 @@ class Concejales extends Controller
                 $offices
             ),
             $name,
-            $name
+            $name,
+            $target_date
         );
         /* phpcs:enable */
 

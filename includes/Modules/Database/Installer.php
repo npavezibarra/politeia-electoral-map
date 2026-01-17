@@ -63,8 +63,25 @@ class Installer
     $election_results = "{$wpdb->prefix}politeia_election_results";
     $candidacies = "{$wpdb->prefix}politeia_candidacies";
     $party_leanings = "{$wpdb->prefix}politeia_party_leanings";
+    $jurisdiction_memberships = "{$wpdb->prefix}politeia_jurisdiction_memberships";
 
     return array(
+      // ============================================================
+      // JURISDICTION MEMBERSHIPS
+      // ============================================================
+      "CREATE TABLE $jurisdiction_memberships (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  parent_jurisdiction_id BIGINT UNSIGNED NOT NULL,
+  child_jurisdiction_id BIGINT UNSIGNED NOT NULL,
+  relationship_type ENUM('ADMINISTRATIVE', 'ELECTORAL') NOT NULL,
+  valid_from DATE NULL,
+  valid_to DATE NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uniq_jurisdiction_membership (parent_jurisdiction_id, child_jurisdiction_id, relationship_type),
+  KEY idx_parent (parent_jurisdiction_id),
+  KEY idx_child (child_jurisdiction_id)
+) ENGINE=InnoDB $collate;",
       // ============================================================
       // PEOPLE
       // ============================================================
