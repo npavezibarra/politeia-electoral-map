@@ -61,7 +61,7 @@ class Jurisdictions extends Controller
 		// 1. Resolve Jurisdiction ID with robust matching
 		// Try exact match first
 		$jur_row = $wpdb->get_row($wpdb->prepare(
-			"SELECT id, official_name, common_name, parent_id FROM $jurisdictions WHERE official_name = %s OR common_name = %s",
+			"SELECT id, official_name, common_name, parent_id, type FROM $jurisdictions WHERE official_name = %s OR common_name = %s",
 			$name,
 			$name
 		));
@@ -73,7 +73,7 @@ class Jurisdictions extends Controller
 
 			// 2. Try exact match with cleaned name (e.g. "de Atacama" -> "DE ATACAMA")
 			$jur_row = $wpdb->get_row($wpdb->prepare(
-				"SELECT id, official_name, common_name, parent_id FROM $jurisdictions WHERE official_name = %s OR common_name = %s",
+				"SELECT id, official_name, common_name, parent_id, type FROM $jurisdictions WHERE official_name = %s OR common_name = %s",
 				$clean_name,
 				$clean_name
 			));
@@ -84,21 +84,19 @@ class Jurisdictions extends Controller
 			// We search for official_name containing the clean name.
 			$like_query = '%' . $wpdb->esc_like($clean_name) . '%';
 			$jur_row = $wpdb->get_row($wpdb->prepare(
-				"SELECT id, official_name, common_name, parent_id FROM $jurisdictions WHERE official_name LIKE %s OR common_name LIKE %s LIMIT 1",
+				"SELECT id, official_name, common_name, parent_id, type FROM $jurisdictions WHERE official_name LIKE %s OR common_name LIKE %s LIMIT 1",
 				$like_query,
 				$like_query
 			));
 		}
 
 		// Fallback for tricky cases (e.g. "O'Higgins" vs "Del Libertador...")
-		// If clean_name has "de ", try removing it too? 
-		// "de Atacama" -> "Atacama".
 		if (!$jur_row && !empty($clean_name)) {
 			$cleaner_name = trim(str_ireplace('de ', '', $clean_name)); // Remove leading 'de '
 			if ($cleaner_name !== $clean_name) {
 				$like_query_2 = '%' . $wpdb->esc_like($cleaner_name) . '%';
 				$jur_row = $wpdb->get_row($wpdb->prepare(
-					"SELECT id, official_name, common_name, parent_id FROM $jurisdictions WHERE official_name LIKE %s OR common_name LIKE %s LIMIT 1",
+					"SELECT id, official_name, common_name, parent_id, type FROM $jurisdictions WHERE official_name LIKE %s OR common_name LIKE %s LIMIT 1",
 					$like_query_2,
 					$like_query_2
 				));
@@ -112,6 +110,7 @@ class Jurisdictions extends Controller
 		$jurisdiction_id = $jur_row->id;
 		$jurisdiction_name = $jur_row->official_name;
 		$common_name = $jur_row->common_name;
+		$jur_type = $jur_row->type;
 
 		$target_date = $req->get_param('date');
 		if (!$target_date) {
@@ -119,42 +118,45 @@ class Jurisdictions extends Controller
 		}
 
 		// 2. Try to find an Office Term active at target_date
-		// We filter by date overlap: started <= target AND (ended >= target OR (ended IS NULL AND status='ACTIVE' AND target >= started))
-		// Simpler approach for Elections fallback: Get the latest election on or before target_date.
+		// SKIP THIS for Districts/Circunscripciones as they have multiple officials handled later
+		$term_row = null;
+		if ($jur_type !== 'DISTRICT' && $jur_type !== 'SENATORIAL_CIRC') {
+			// We filter by date overlap: started <= target AND (ended >= target OR (ended IS NULL AND status='ACTIVE' AND target >= started))
 
-		$term_query = "SELECT 
-				CONCAT_WS(' ', p.given_names, p.paternal_surname, p.maternal_surname) AS person_name,
-				o.title AS office_title,
-				t.started_on,
-				t.ended_on as planned_end_on,
-				NULL as party_short_name,
-				(
-                    SELECT c.votes 
-                    FROM $candidacies c
-                    WHERE c.person_id = t.person_id 
-                      AND c.jurisdiction_id = t.jurisdiction_id
-                      AND c.elected = 1
-                    ORDER BY c.id DESC LIMIT 1
-                ) as votes,
-				(
-                    SELECT er.total_votes
-                    FROM $election_results er
-                    INNER JOIN $candidacies c2 ON c2.election_id = er.election_id AND c2.jurisdiction_id = er.jurisdiction_id
-                    WHERE c2.person_id = t.person_id 
-                      AND c2.jurisdiction_id = t.jurisdiction_id
-                      AND c2.elected = 1
-                    ORDER BY c2.id DESC LIMIT 1
-                ) as total_votes
-			FROM $office_terms t
-			INNER JOIN $people p ON p.id = t.person_id
-			INNER JOIN $offices o ON o.id = t.office_id
-			WHERE t.jurisdiction_id = %d 
-			  AND t.started_on <= %s 
-			  AND (t.ended_on >= %s OR t.ended_on IS NULL)
-			ORDER BY t.started_on DESC
-			LIMIT 1";
+			$term_query = "SELECT 
+                    CONCAT_WS(' ', p.given_names, p.paternal_surname, p.maternal_surname) AS person_name,
+                    o.title AS office_title,
+                    t.started_on,
+                    t.ended_on as planned_end_on,
+                    NULL as party_short_name,
+                    (
+                        SELECT c.votes 
+                        FROM $candidacies c
+                        WHERE c.person_id = t.person_id 
+                        AND c.jurisdiction_id = t.jurisdiction_id
+                        AND c.elected = 1
+                        ORDER BY c.id DESC LIMIT 1
+                    ) as votes,
+                    (
+                        SELECT er.total_votes
+                        FROM $election_results er
+                        INNER JOIN $candidacies c2 ON c2.election_id = er.election_id AND c2.jurisdiction_id = er.jurisdiction_id
+                        WHERE c2.person_id = t.person_id 
+                        AND c2.jurisdiction_id = t.jurisdiction_id
+                        AND c2.elected = 1
+                        ORDER BY c2.id DESC LIMIT 1
+                    ) as total_votes
+                FROM $office_terms t
+                INNER JOIN $people p ON p.id = t.person_id
+                INNER JOIN $offices o ON o.id = t.office_id
+                WHERE t.jurisdiction_id = %d 
+                AND t.started_on <= %s 
+                AND (t.ended_on >= %s OR t.ended_on IS NULL)
+                ORDER BY t.started_on DESC
+                LIMIT 1";
 
-		$term_row = $wpdb->get_row($wpdb->prepare($term_query, $jurisdiction_id, $target_date, $target_date), ARRAY_A);
+			$term_row = $wpdb->get_row($wpdb->prepare($term_query, $jurisdiction_id, $target_date, $target_date), ARRAY_A);
+		}
 
 		// Fetch Parent Region Name
 		$parent_region_name = null;
@@ -295,11 +297,14 @@ class Jurisdictions extends Controller
                     o.title AS office_title,
                     po.short_name AS party_short_name,
                     t.started_on,
-                    t.ended_on
+                    t.ended_on,
+                    t.planned_end_on
                 FROM $office_terms t
                 INNER JOIN $people p ON p.id = t.person_id
                 INNER JOIN $offices o ON o.id = t.office_id
-                LEFT JOIN $parties po ON po.id = t.party_id
+                -- Fix: Use candidacies to link party, since terms table has no party_id
+                LEFT JOIN $candidacies c ON c.person_id = t.person_id AND c.elected = 1
+                LEFT JOIN $parties po ON po.id = c.party_id
                 WHERE t.jurisdiction_id = %d 
                   AND o.code = %s
                   AND t.started_on <= %s 
@@ -311,29 +316,35 @@ class Jurisdictions extends Controller
 			if (!empty($officials)) {
 				$first = $officials[0];
 
-				// Reuse fields. We will pass the full list in 'concejales' (renamed or repurposed field if frontend supports it, 
-				// but front checks 'concejales' endpoint separately. 
-				// We can pass 'officials_list' and update frontend to use it if present?
-
-				// Wait, frontend `showInfo` calls `/concejales` separately.
-				// For now, let's return the first deputy as the "Main" person so the card isn't empty.
+				// Prepare officials array for frontend list
+				$officials_list = array_map(function ($o) {
+					return [
+						'name' => $o['person_name'],
+						'title' => $o['office_title'],
+						'party' => $o['party_short_name'] ?? '',
+						'start' => $o['started_on'],
+						'end' => $o['planned_end_on'] // Use planned end
+					];
+				}, $officials);
 
 				return new \WP_REST_Response(
 					array(
 						'found' => true,
+						'api_version' => 'v2.1', // Bump version to confirm new code
 						'jurisdiction_name' => $jurisdiction_name,
 						'common_name' => $common_name,
 						'parent_region_name' => $parent_region_name,
-						'person_name' => $first['person_name'] . (count($officials) > 1 ? ' y ' . (count($officials) - 1) . ' más' : ''),
-						'photo_url' => null, // Photos might be available?
-						'office_title' => $first['office_title'] . (count($officials) > 1 ? 's' : ''), // Pluralize if many
-						'party_short_name' => $first['party_short_name'], // Just one party?
+						'person_name' => str_replace('  ', ' ', trim($first['person_name'])) . (count($officials) > 1 ? ' y ' . (count($officials) - 1) . ' más' : ''),
+						'photo_url' => null,
+						'office_title' => $first['office_title'] . (count($officials) > 1 ? 's' : ''), // Pluralize
+						'party_short_name' => $first['party_short_name'],
 						'started_on' => $first['started_on'],
-						'planned_end_on' => $first['ended_on'] ?: date('Y-m-d', strtotime($first['started_on'] . ' + 4 years')),
-						'votes' => 0, // Aggregate votes?
+						'planned_end_on' => $first['planned_end_on'] ?: date('Y-m-d', strtotime($first['started_on'] . ' + 4 years')), // Fix column
+						'votes' => 0,
 						'total_votes' => 0,
-						'population' => 0, // District pop?
+						'population' => 0,
 						'budget' => null,
+						'officials' => $officials_list, // Pass full list
 						'debug_message' => "Found " . count($officials) . " officials."
 					),
 					200

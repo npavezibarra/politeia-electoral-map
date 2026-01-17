@@ -479,8 +479,21 @@
       const headerType = document.getElementById('info-header-type');
 
       if (headerType) {
-        // Map type "Region" -> "Región" for display
-        headerType.textContent = (type === 'Region') ? 'Región' : ((type === 'District') ? 'Distrito' : type);
+        let typeLabel = 'Jurisdicción';
+        if (type === 'Comuna') typeLabel = 'Alcaldía'; // "Alcaldía" as type, Name has "de [Comuna]"? Or "Comuna" as type logic?
+        // User requested: 
+        // Header Label Format:
+        // Comuna: "Alcaldía de [Nombre]" (This implies the big text)
+        // Type label usually just says the category.
+        // Let's stick to the prompt's table for the BIG header (headerName).
+
+        // For the small type label (headerType):
+        if (type === 'Comuna') typeLabel = 'Municipal.'; // Or just 'Comuna'
+        else if (type === 'Region') typeLabel = 'Regional';
+        else if (type === 'District' || type === 'Distrito') typeLabel = 'Distrito';
+        else if (type === 'Circunscripción' || type === 'Senatorial Circ.') typeLabel = 'Circunscripción';
+
+        headerType.textContent = typeLabel;
       }
 
       const headerName = document.getElementById('info-header-name');
@@ -498,7 +511,7 @@
       const concejalesList = document.getElementById('info-concejales-list');
 
       // Clear previous
-      if (headerName) headerName.textContent = name;
+      // Header Name logic moved below to use Data or Fallback
       if (headerRegion) headerRegion.textContent = '';
       if (mayorTitle) mayorTitle.textContent = '';
       if (mayorName) mayorName.textContent = 'Cargando...';
@@ -513,23 +526,24 @@
 
       box.style.display = 'block';
 
+      // Default Header Name (Fallback)
+      if (headerName) {
+        let label = toTitleCase(name);
+        if (type === 'Comuna') label = `Alcaldía de ${label}`;
+        else if (type === 'Region') label = `Gobernación de ${label}`;
+        headerName.textContent = label;
+      }
+
       // --- District / Circunscripción Special Handling ---
       if (type === 'District' || type === 'Distrito' || type === 'Circunscripción') {
-        if (headerName) headerName.textContent = name;
-
         // Hide standard sections not needed for District/Circ
         if (document.getElementById('info-mayor')) document.getElementById('info-mayor').style.display = 'none';
         if (document.getElementById('info-mayor-photo')) document.getElementById('info-mayor-photo').style.display = 'none';
 
         if (votesEl) votesEl.style.display = 'none';
-        if (concejalesList) document.getElementById('info-concejales').style.display = 'none';
+        if (concejalesList) document.getElementById('info-concejales').style.display = 'none'; // Will be re-enabled if data found
         if (budgetEl) budgetEl.style.display = 'none';
 
-        // Show Period Nav
-        if (termStart) termStart.textContent = '2022';
-        if (termEnd) termEnd.textContent = '2030';
-
-        // Let it fetch
       } else {
         // Reset displays for non-district (Comuna/Region/Circunscripción)
         if (document.getElementById('info-mayor')) document.getElementById('info-mayor').style.display = 'flex';
@@ -544,7 +558,15 @@
         if (res.ok) {
           const data = await res.json();
           if (data.found) {
-            if (headerName && data.common_name) headerName.textContent = toTitleCase(data.common_name);
+
+            // Dynamic Header Name from API Data
+            if (headerName && data.common_name) {
+              let finalName = toTitleCase(data.common_name);
+              if (type === 'Comuna') finalName = `Alcaldía de ${finalName}`;
+              else if (type === 'Region') finalName = `Gobernación de ${finalName}`;
+              headerName.textContent = finalName;
+            }
+
             if (headerRegion && data.parent_region_name) headerRegion.textContent = toTitleCase(data.parent_region_name);
 
             if (mayorTitle && data.office_title) mayorTitle.textContent = data.office_title;
@@ -563,7 +585,11 @@
               const start = new Date(data.started_on);
               const end = new Date(data.planned_end_on);
               const now = new Date();
-              const ratio = Math.min(Math.max((now - start) / (end - start), 0), 1);
+              // Calculate ratio logic...
+              let ratio = 0;
+              if (now > end) ratio = 1;
+              else if (now < start) ratio = 0;
+              else ratio = (now - start) / (end - start);
               termProgress.style.width = (ratio * 100) + '%';
             }
             if (votesEl && type !== 'District' && type !== 'Distrito' && type !== 'Circunscripción') {
@@ -590,8 +616,41 @@
               }
             }
 
-            // Concejales logic
-            if (concejalesList && type !== 'District' && type !== 'Distrito' && type !== 'Circunscripción') {
+            // Officials List Logic (Senators, Deputies, Concejales)
+            const officialsContainer = document.getElementById('info-concejales');
+            const officialsLabel = officialsContainer ? officialsContainer.firstElementChild : null;
+
+            console.log('Officials Debug:', { type, officials: data.officials, office_title: data.office_title });
+
+            // 1. Check for `officials` array (from new API logic for Senators/Deputies)
+            // Even if empty, if it's a District/Circ, we might want to show "No Results" if expected?
+            if (data.officials && data.officials.length > 0) {
+              if (officialsContainer) {
+                officialsContainer.style.display = 'block';
+                // Update Label dynamically based on office title
+                if (officialsLabel) {
+                  // Pluralize roughly based on title
+                  let title = (data.office_title || 'Representantes').toUpperCase();
+                  if (!title.endsWith('S')) title += 'S'; // Simple pluralization
+                  if (!title.endsWith(':')) title += ':';
+                  officialsLabel.textContent = title;
+                }
+
+                if (concejalesList) {
+                  concejalesList.innerHTML = data.officials.map((c, i) =>
+                    `<div style="font-size: 12px; margin-bottom: 4px;">${toTitleCase(c.name)} <span style="color:#666; font-size:10px;">(${c.party})</span></div>`
+                  ).join('');
+                  concejalesList.style.display = 'block';
+                }
+              }
+            }
+            // 2. Fallback to /concejales endpoint for regular Communes if not a District/Circ
+            else if (concejalesList && type !== 'District' && type !== 'Distrito' && type !== 'Circunscripción') {
+              // Ensure label is reset to Concejales
+              if (officialsLabel) officialsLabel.textContent = 'CONCEJALES:';
+
+              document.getElementById('info-concejales').style.display = 'block'; // Ensure visible
+
               try {
                 const concRes = await fetch(`/wp-json/politeia/v1/concejales?name=${encodeURIComponent(name)}&date=${targetDateStr}`);
                 if (concRes.ok) {
@@ -605,6 +664,18 @@
                   }
                 }
               } catch (e) { }
+            } else {
+              // Show "No found" for Districts/Circs too
+              if (type === 'District' || type === 'Distrito' || type === 'Circunscripción') {
+                if (officialsContainer) {
+                  officialsContainer.style.display = 'block';
+                  if (officialsLabel) officialsLabel.textContent = 'REPRESENTANTES:';
+                  if (concejalesList) {
+                    concejalesList.innerHTML = '<div style="font-size: 12px; color: #6b7280;">No se encontraron representantes.</div>';
+                    concejalesList.style.display = 'block';
+                  }
+                }
+              }
             }
 
             if (populationEl && data.population) {
@@ -685,7 +756,7 @@
       }
 
       hits.sort((a, b) => a.score - b.score || a.label.localeCompare(b.label));
-      return hits.slice(0, 10);
+      return hits.slice(0, 50); // Increased limit to show all Circunscriptions
     }
 
     async function selectItem(item) {
@@ -693,6 +764,9 @@
       if (item.file !== currentRegionFile) {
         await loadRegion(item.file);
       }
+
+      // Reset Period to Current Date on Search Selection
+      currentDate = new Date();
 
       document.getElementById('q').value = item.label; // Update search bar immediately
       document.getElementById('suggestions').classList.remove('visible'); // Hide suggestions
@@ -915,26 +989,86 @@
       document.addEventListener('click', e => { if (!e.target.closest('.toolbar')) box.classList.remove('visible'); });
 
       // Temporal Navigation Listeners
-      document.getElementById('term-prev').addEventListener('click', () => navigatePeriod(-1));
-      document.getElementById('term-next').addEventListener('click', () => navigatePeriod(1));
+      document.getElementById('term-prev').addEventListener('click', (e) => {
+        e.stopPropagation();
+        navigateCycle(-1);
+      });
+      document.getElementById('term-next').addEventListener('click', (e) => {
+        e.stopPropagation();
+        navigateCycle(1);
+      });
     };
 
-    function navigatePeriod(direction) {
+    // --- Election Cycle Navigation Logic ---
+    const ELECTION_CYCLES = {
+      'Comuna': {
+        // Terms start roughly: Dec 2008, Dec 2012, Dec 2016, June 2021, Dec 2024.
+        terms: ['2008-12-07', '2012-12-07', '2016-12-07', '2021-06-29', '2024-12-07']
+      },
+      'Region': {
+        terms: ['2021-07-15', '2025-01-07']
+      },
+      'District': { // Deputies
+        terms: ['2014-03-12', '2018-03-12', '2022-03-12', '2026-03-12']
+      },
+      'Distrito': { terms: ['2014-03-12', '2018-03-12', '2022-03-12', '2026-03-12'] },
+      'Circunscripción': { // Senators (Elections 2017, 2021... Terms 2018, 2022...)
+        terms: ['2014-03-12', '2018-03-12', '2022-03-12', '2026-03-12']
+      },
+      'Senatorial Circ.': { terms: ['2014-03-12', '2018-03-12', '2022-03-12', '2026-03-12'] }
+    };
+
+    function getCycleConfig(type) {
+      return ELECTION_CYCLES[type] || ELECTION_CYCLES['Comuna'];
+    }
+
+    function navigateCycle(direction) {
       if (!currentEntityName) return;
 
-      // Logic: Context-Aware Jump
-      // Commune/Region: 4 years
-      // District: 8 years
-      let years = 4;
-      if (currentEntityType === 'Distrito' || currentEntityType === 'District') {
-        years = 8;
+      const config = getCycleConfig(currentEntityType);
+      const dateStr = currentDate.toISOString().slice(0, 10);
+
+      // Find current term index
+      // We find the latest term start date that is <= current date
+      let currentIdx = -1;
+      for (let i = 0; i < config.terms.length; i++) {
+        if (config.terms[i] <= dateStr) {
+          currentIdx = i;
+        } else {
+          break;
+        }
       }
 
-      // Adjust Year
-      // We jump by 'years' amount from the current Active Date
-      currentDate.setFullYear(currentDate.getFullYear() + (direction * years));
+      if (currentIdx === -1) {
+        // Before any known term? Jump to first.
+        currentIdx = 0;
+        if (direction < 0) return; // Can't go back
+      }
 
-      // Refresh Info
+      let newIdx = currentIdx + direction;
+
+      // Bounds check
+      if (newIdx < 0) newIdx = 0; // Clamp to first
+      if (newIdx >= config.terms.length) newIdx = config.terms.length - 1; // Clamp to last
+
+      // If we are essentially already there (e.g. clicking next on last item), 
+      // check if currentDate matches exactly. If strict bounds, do nothing.
+      // But maybe user wants to 'reset' to start date if they drifted?
+
+      const newDateStr = config.terms[newIdx];
+
+      // Only update if it's actually a different Period (or cycle step)
+      // If I am in 2022 (index 1) and click next -> index 2 (2026).
+      // If I am in 2025 (index 1) and click next -> index 2 (2026).
+      // If I am in 2026 (index 2) and click next -> index 2 (clamp).
+      if (newIdx === currentIdx && direction !== 0 && newDateStr <= dateStr) {
+        // Already at or past the target start date of the last item.
+        return;
+      }
+
+      console.log(`Navigating from ${dateStr} to term index ${newIdx}: ${newDateStr}`);
+
+      currentDate = new Date(newDateStr);
       showInfo(currentEntityName, currentEntityType, currentDate);
     }
 
