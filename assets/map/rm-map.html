@@ -488,7 +488,7 @@
         // Let's stick to the prompt's table for the BIG header (headerName).
 
         // For the small type label (headerType):
-        if (type === 'Comuna') typeLabel = 'Municipal.'; // Or just 'Comuna'
+        if (type === 'Comuna') typeLabel = 'Comuna';
         else if (type === 'Region') typeLabel = 'Regional';
         else if (type === 'District' || type === 'Distrito') typeLabel = 'Distrito';
         else if (type === 'Circunscripción' || type === 'Senatorial Circ.') typeLabel = 'Circunscripción';
@@ -529,8 +529,10 @@
       // Default Header Name (Fallback)
       if (headerName) {
         let label = toTitleCase(name);
-        if (type === 'Comuna') label = `Alcaldía de ${label}`;
-        else if (type === 'Region') label = `Gobernación de ${label}`;
+        // Only modify if NOT Comuna (User wants just "Pirque")
+        if (type === 'Region') label = `Gobernación de ${label}`;
+        else if (type === 'District') label = `Distrito ${label}`;
+
         headerName.textContent = label;
       }
 
@@ -562,8 +564,9 @@
             // Dynamic Header Name from API Data
             if (headerName && data.common_name) {
               let finalName = toTitleCase(data.common_name);
-              if (type === 'Comuna') finalName = `Alcaldía de ${finalName}`;
-              else if (type === 'Region') finalName = `Gobernación de ${finalName}`;
+              // For Comuna, we want JUST the name. For others, keep existing logic or as requested later.
+              if (type === 'Region') finalName = `Gobernación de ${finalName}`;
+
               headerName.textContent = finalName;
             }
 
@@ -577,8 +580,23 @@
             if (termEnd) termEnd.textContent = data.planned_end_on || '';
 
             // Re-show photo if we have one and we aren't in District/Circ mode 
+            // Re-show photo if we have one and we aren't in District/Circ mode 
             if (type !== 'District' && type !== 'Distrito' && type !== 'Circunscripción') {
-              if (document.getElementById('info-mayor-photo')) document.getElementById('info-mayor-photo').style.display = 'block';
+              const photoEl = document.getElementById('info-mayor-photo');
+              if (photoEl) {
+                photoEl.style.display = 'block';
+                // Reset first
+                photoEl.style.backgroundImage = 'none';
+                photoEl.style.backgroundSize = 'cover';
+                photoEl.style.backgroundPosition = 'center';
+
+                if (data.photo_url) {
+                  // The data.photo_url is e.g. "politician_profile_photos/2024/..."
+                  // We need to point to assets. rm-map.html is in assets/map/
+                  // So we need ../ to go up to assets/
+                  photoEl.style.backgroundImage = `url(../${data.photo_url})`;
+                }
+              }
             }
 
             if (termProgress && data.started_on && data.planned_end_on) {
