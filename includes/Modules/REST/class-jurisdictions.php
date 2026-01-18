@@ -56,6 +56,8 @@ class Jurisdictions extends Controller
 		$parties = $wpdb->prefix . 'politeia_political_organizations';
 		$office_terms = $wpdb->prefix . 'politeia_office_terms';
 		$election_results = $wpdb->prefix . 'politeia_election_results';
+		$party_memberships = $wpdb->prefix . 'politeia_party_memberships';
+		$party_leanings = $wpdb->prefix . 'politeia_party_leanings';
 
 
 		// 1. Resolve Jurisdiction ID with robust matching
@@ -295,20 +297,35 @@ class Jurisdictions extends Controller
 			$terms_query = "SELECT 
                     CONCAT_WS(' ', p.given_names, p.paternal_surname) AS person_name,
                     o.title AS office_title,
-                    po.short_name AS party_short_name,
+                    CASE 
+                        WHEN pm.id IS NOT NULL THEN po_mem.short_name
+                        WHEN pl.id IS NOT NULL THEN CONCAT('Ind. ', po_lean.short_name)
+                        ELSE po_cand.short_name 
+                    END AS party_short_name,
                     t.started_on,
                     t.ended_on,
                     t.planned_end_on
                 FROM $office_terms t
                 INNER JOIN $people p ON p.id = t.person_id
                 INNER JOIN $offices o ON o.id = t.office_id
-                -- Fix: Use candidacies to link party, since terms table has no party_id
+                
+                -- 1. Try Official Membership
+                LEFT JOIN $party_memberships pm ON pm.person_id = t.person_id 
+                LEFT JOIN $parties po_mem ON po_mem.id = pm.organization_id
+
+                -- 2. Try Independent Leaning
+                LEFT JOIN $party_leanings pl ON pl.person_id = t.person_id
+                LEFT JOIN $parties po_lean ON po_lean.id = pl.organization_id
+
+                -- 3. Fallback to Candidacy (Legacy)
                 LEFT JOIN $candidacies c ON c.person_id = t.person_id AND c.elected = 1
-                LEFT JOIN $parties po ON po.id = c.party_id
+                LEFT JOIN $parties po_cand ON po_cand.id = c.party_id
+
                 WHERE t.jurisdiction_id = %d 
                   AND o.code = %s
                   AND t.started_on <= %s 
                   AND (t.ended_on >= %s OR t.ended_on IS NULL)
+                GROUP BY t.id
                 ORDER BY t.started_on DESC, p.paternal_surname ASC";
 
 			$officials = $wpdb->get_results($wpdb->prepare($terms_query, $jurisdiction_id, $office_code_target, $target_date, $target_date), ARRAY_A);
