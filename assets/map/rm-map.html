@@ -591,10 +591,8 @@
                 photoEl.style.backgroundPosition = 'center';
 
                 if (data.photo_url) {
-                  // The data.photo_url is e.g. "politician_profile_photos/2024/..."
-                  // We need to point to assets. rm-map.html is in assets/map/
-                  // So we need ../ to go up to assets/
-                  photoEl.style.backgroundImage = `url(../${data.photo_url})`;
+                  // photo_url is now an absolute URL from the API
+                  photoEl.style.backgroundImage = `url(${data.photo_url})`;
                 }
               }
             }
