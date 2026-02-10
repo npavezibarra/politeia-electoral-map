@@ -256,6 +256,15 @@ class Jurisdictions extends Controller
 				$jurisdiction_id
 			));
 
+			// Construct absolute photo URL if relative path exists
+			$photo_url = $cand_row['profile_photo_url'];
+			if ($photo_url && !str_starts_with($photo_url, 'http')) {
+				// Encode each segment to handle spaces
+				$segments = explode('/', $photo_url);
+				$encoded_segments = array_map('rawurlencode', $segments);
+				$photo_url = plugins_url('politeia-electoral-map/assets/' . implode('/', $encoded_segments));
+			}
+
 			return new \WP_REST_Response(
 				array(
 					'found' => true,
@@ -263,7 +272,7 @@ class Jurisdictions extends Controller
 					'common_name' => $common_name,
 					'parent_region_name' => $parent_region_name,
 					'person_name' => trim($cand_row['person_name']),
-					'photo_url' => $cand_row['profile_photo_url'],
+					'photo_url' => $photo_url,
 					'office_title' => $cand_row['office_title'],
 					'party_short_name' => $cand_row['party_short_name'],
 					'started_on' => $cand_row['started_on'],

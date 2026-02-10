@@ -388,6 +388,14 @@
     // --- Utils ---
     const norm = s => (s || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
 
+    // Timezone-safe date to YYYY-MM-DD (using UTC to avoid shift)
+    const formatDate = d => {
+      const year = d.getUTCFullYear();
+      const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(d.getUTCDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
     const toTitleCase = s => {
       if (!s) return s;
       return s.toLowerCase().split(' ').map(word => {
@@ -473,7 +481,7 @@
       currentEntityType = type;
       if (dateObj) currentDate = dateObj; // Only update if passed explicitly, else keep current nav state
 
-      const targetDateStr = currentDate.toISOString().slice(0, 10); // YYYY-MM-DD
+      const targetDateStr = formatDate(currentDate); // YYYY-MM-DD
 
       const box = document.getElementById('comune-info-card');
       const headerType = document.getElementById('info-header-type');
@@ -1016,22 +1024,24 @@
     };
 
     // --- Election Cycle Navigation Logic ---
+    // NOTE: These are TERM START dates (when officials take office), NOT election dates
     const ELECTION_CYCLES = {
       'Comuna': {
-        // Terms start roughly: Dec 2008, Dec 2012, Dec 2016, June 2021, Dec 2024.
-        terms: ['2008-12-07', '2012-12-07', '2016-12-07', '2021-06-29', '2024-12-07']
+        // Alcalde terms: 2008, 2012, 2016 in Dec; 2021 delayed to June 28; 2024 in Dec
+        terms: ['2008-12-06', '2012-12-06', '2016-12-06', '2021-06-28', '2024-12-06']
       },
       'Region': {
-        terms: ['2021-07-15', '2025-01-07']
+        // Gobernador terms: First in July 2021
+        terms: ['2021-07-14', '2025-01-06']
       },
-      'District': { // Deputies
-        terms: ['2014-03-12', '2018-03-12', '2022-03-12', '2026-03-12']
+      'District': { // Deputies - terms start March 11
+        terms: ['2014-03-11', '2018-03-11', '2022-03-11', '2026-03-11']
       },
-      'Distrito': { terms: ['2014-03-12', '2018-03-12', '2022-03-12', '2026-03-12'] },
-      'Circunscripción': { // Senators (Elections 2017, 2021... Terms 2018, 2022...)
-        terms: ['2014-03-12', '2018-03-12', '2022-03-12', '2026-03-12']
+      'Distrito': { terms: ['2014-03-11', '2018-03-11', '2022-03-11', '2026-03-11'] },
+      'Circunscripción': { // Senators - terms start March 11
+        terms: ['2014-03-11', '2018-03-11', '2022-03-11', '2026-03-11']
       },
-      'Senatorial Circ.': { terms: ['2014-03-12', '2018-03-12', '2022-03-12', '2026-03-12'] }
+      'Senatorial Circ.': { terms: ['2014-03-11', '2018-03-11', '2022-03-11', '2026-03-11'] }
     };
 
     function getCycleConfig(type) {
@@ -1042,7 +1052,7 @@
       if (!currentEntityName) return;
 
       const config = getCycleConfig(currentEntityType);
-      const dateStr = currentDate.toISOString().slice(0, 10);
+      const dateStr = formatDate(currentDate);
 
       // Find current term index
       // We find the latest term start date that is <= current date
