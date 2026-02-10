@@ -1,0 +1,33 @@
+# Database Connection Instructions (Local by Flywheel)
+
+Para conectar a la base de datos de este sitio desde la terminal, utiliza las siguientes credenciales y métodos:
+
+## 1. Conexión Directa (Recomendado)
+He creado un script en el root del sitio para facilitar las consultas rápidas:
+
+**Archivo:** `../../../../mysql-query.sh`  
+**Uso:** 
+```bash
+./mysql-query.sh "SELECT * FROM wp_politeia_elections LIMIT 5"
+```
+
+## 2. Credenciales de MySQL
+Si tienes instalado un cliente de MySQL (como `mysql-client` de Homebrew), utiliza estos parámetros:
+
+- **Host:** localhost
+- **User:** root
+- **Password:** root
+- **Database:** local
+- **Socket:** /Users/nicolasibarra/Library/Application Support/Local/run/XqvmEtSc4/mysql/mysqld.sock
+
+**Ejemplo de comando:**
+```bash
+mysql -u root -proot --socket="/Users/nicolasibarra/Library/Application Support/Local/run/XqvmEtSc4/mysql/mysqld.sock" local
+```
+
+## 3. Acceso vía PHP (WordPress context)
+También puedes ver un resumen de las tablas accediendo por navegador a:
+`http://politeia.local/db_query.php` (ejecuta a través de $wpdb)
+
+---
+*Generado automáticamente por Antigravity para facilitar la gestión de datos.*
